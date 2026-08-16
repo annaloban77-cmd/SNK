@@ -1,0 +1,149 @@
+// НК-Контроль — Система нормативного контроля для судостроения
+// Prisma schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Справочник типов документов (чертеж детали, сборочный чертеж, спецификация и т.д.)
+model DocType {
+  id          String   @id @default(cuid())
+  code        String   @unique // "drawing", "assembly", "specification", "welding", "circuit"...
+  name        String   // "Чертеж детали"
+  category    String   // "graphic" | "text" | "table" | "cad"
+  createdAt   DateTime @default(now())
+  documents   Document[]
+}
+
+// Проект / комплект документации
+model Project {
+  id          String   @id @default(cuid())
+  code        String   @unique // "Судно-проект-2025"
+  name        String
+  description String?
+  stage       String   @default("РК") // стадия разработки: ЭП, ТП, РД, РК
+  status      String   @default("active") // active | archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  documents   Document[]
+}
+
+// Документ (скан или CAD-файл)
+model Document {
+  id            String   @id @default(cuid())
+  projectId     String?
+  name          String   // имя файла
+  originalName  String
+  mimeType      String
+  size          Int      // в байтах
+  format        String   // A4 | A3 | A2 | A1 | A0 | unknown
+  sourceType    String   // "scan" | "pdf" | "dwg" | "dxf" | "cdw" | "sldprt" | "sldasm" | "slddrw" | "spw"
+  status        String   @default("new") // new | processing | analyzed | failed
+  filePath      String   // путь к сохраненному файлу (uploads/)
+  // Извлечённые данные (после VLM-анализа)
+  stampJson     String?  // JSON-строка с полями штампа
+  ocrText       String?  // распознанный текст (если есть)
+  // Метрики проверки
+  issueCount    Int      @default(0)
+  highCount     Int      @default(0)
+  mediumCount   Int      @default(0)
+  lowCount      Int      @default(0)
+  checkDuration Int?     // мс
+  // Связи
+  docTypeId     String?
+  docType       DocType? @relation(fields: [docTypeId], references: [id])
+  project       Project? @relation(fields: [projectId], references: [id])
+  issues        Issue[]
+  checks        CheckLog[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Нормативный документ (ГОСТ/ОСТ/СТО/РД/Регистр)
+model Standard {
+  id          String   @id @default(cuid())
+  code        String   @unique // "ГОСТ 2.104-2006"
+  name        String   // "Основные надписи"
+  type        String   // "GOST" | "OST" | "STO" | "RD" | "REGISTER" | "ESKD" | "SPDS"
+  scope       String   // область применения (короткое описание)
+  description String?  // полное описание / ключевые требования
+  status      String   @default("active") // active | cancelled | draft
+  publishedAt String?  // год/дата
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  rules       Rule[]
+
+  @@index([type])
+  @@index([status])
+}
+
+// Правило нормоконтроля
+model Rule {
+  id          String   @id @default(cuid())
+  code        String   @unique // "R-STAMP-001"
+  name        String
+  description String
+  category    String   // "stamp" | "specification" | "material" | "cad_attr" | "format" | "geometry" | "semantic"
+  method      String   // "deterministic" | "semantic" | "vision"
+  severity    String   @default("medium") // high | medium | low
+  gostField   String?  // проверяемое поле/признак
+  expression  String?  // для deterministic: JSON с условием
+  enabled     Boolean  @default(true)
+  standardId  String?
+  standard    Standard? @relation(fields: [standardId], references: [id])
+  issues      Issue[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([enabled])
+}
+
+// Замечание нормоконтролера
+model Issue {
+  id           String   @id @default(cuid())
+  documentId   String
+  ruleId       String?
+  code         String   // код правила, породившего замечание
+  title        String   // краткое название
+  description  String   // что не так
+  requirement  String?  // требование ГОСТ
+  recommendation String? // рекомендация по исправлению
+  gostRef      String?  // "ГОСТ 2.104-2006, п. 3.1"
+  field        String?  // проверяемое поле (Масса, Обозначение...)
+  severity     String   @default("medium") // high | medium | low
+  status       String   @default("new") // new | confirmed | rejected | fixed
+  source       String   @default("auto") // auto | expert | llm
+  evidence     String?  // доказательство (значение поля/фрагмент текста)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  rule         Rule?    @relation(fields: [ruleId], references: [id])
+
+  @@index([documentId])
+  @@index([severity])
+  @@index([status])
+}
+
+// Журнал проверок
+model CheckLog {
+  id          String   @id @default(cuid())
+  documentId  String
+  stage       String   // "upload" | "preprocess" | "vlm_extract" | "rules_check" | "llm_semantic" | "report"
+  status      String   // "started" | "success" | "failed"
+  durationMs  Int?
+  message     String?
+  createdAt   DateTime @default(now())
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
