@@ -158,6 +158,12 @@ export interface DashboardStats {
   standardsCount?: number
   rulesCount?: number
   categoriesCount?: number
+  // Business metrics (P5)
+  avgCheckTimeSec?: number | null
+  firstTimePassRate?: number
+  totalChecks?: number
+  estimatedHoursSaved?: number
+  estimatedCostSaved?: number
 }
 
 export interface AnalyzeResponse {

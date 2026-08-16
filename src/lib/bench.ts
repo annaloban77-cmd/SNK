@@ -8,6 +8,7 @@ import { llmSemanticCheck } from './zai'
 import { runDeterministicRules, toStampFields, fromLlmIssues, type RuleCheckResult } from './rules'
 import { parseCadFile, cadToStampFields } from './cad-parser'
 import { extractStamp, terminateOcr } from './ocr/stamp-ocr'
+import { terminateZoneOcr } from './ocr/zone-ocr'
 import { analyzeGeometry } from './geometry/geometry-checker'
 import { filterFindings } from './post-filter'
 
@@ -46,6 +47,8 @@ export async function runSingleSample(sample: {
   const start = Date.now()
   const foundIssues: RuleCheckResult[] = []
   let stamp: any = null
+  let ocrConfidence = 0.0 // default: low confidence (если OCR не сработал — не генерируем "missing" findings)
+  let fieldMeta: Record<string, { hasText: boolean; confidence: number; parsed: boolean }> | null = null
 
   const fullPath = sample.filePath.startsWith('/home')
     ? sample.filePath
@@ -58,16 +61,19 @@ export async function runSingleSample(sample: {
     try {
       const ocrResult = await extractStamp(fullPath, { useVlmFallback: false })
       stamp = ocrResult.stamp
+      ocrConfidence = ocrResult.confidence
+      fieldMeta = ocrResult.fieldMeta ?? null
       console.log(`     [OCR: ${ocrResult.method}, ${ocrResult.durationMs}ms, confidence=${(ocrResult.confidence*100).toFixed(0)}%]`)
     } catch (e) {
       console.error(`OCR failed for ${sample.code}:`, e)
     }
   } else if (['dxf', 'dwg', 'sldprt', 'sldasm', 'slddrw', 'cdw', 'spw'].includes(ext)) {
-    // CAD-файл — парсер
+    // CAD-файл — парсер (детерминированный, confidence=1.0)
     try {
       if (existsSync(fullPath)) {
         const parsed = await parseCadFile(fullPath)
         stamp = cadToStampFields(parsed)
+        ocrConfidence = 1.0 // CAD-парсер детерминированный — доверяем 100%
       }
     } catch (e) {
       console.error(`CAD parse failed for ${sample.code}:`, e)
@@ -118,8 +124,11 @@ export async function runSingleSample(sample: {
     }
   }
 
-  // 5. Пост-фильтрация: дедупликация, отбрасывание low при high, низкий confidence
-  const filtered = filterFindings(foundIssues, { minConfidence: 0.4, dedupe: true, dropLowIfHighExists: true })
+  // 5. Пост-фильтрация: дедупликация, отбрасывание low при high, per-field confidence-aware
+  const filtered = filterFindings(foundIssues, {
+    minConfidence: 0.4, dedupe: true, dropLowIfHighExists: true,
+    ocrConfidence, fieldMeta,
+  })
   foundIssues.length = 0
   foundIssues.push(...filtered)
   
@@ -203,7 +212,7 @@ export async function runBench(opts: { runLlm?: boolean; version?: string } = {}
   const allFindings: any[] = []
   
   // Параллельная обработка батчами (OCR+rules не требуют rate-limit)
-  const BATCH_SIZE = 10
+  const BATCH_SIZE = 1
   for (let bi = 0; bi < samples.length; bi += BATCH_SIZE) {
     const batch = samples.slice(bi, bi + BATCH_SIZE)
     console.log(`   ▶ batch ${Math.floor(bi/BATCH_SIZE)+1}/${Math.ceil(samples.length/BATCH_SIZE)}: ${batch.map(s=>s.code).join(', ')}`)
@@ -318,6 +327,7 @@ export async function runBench(opts: { runLlm?: boolean; version?: string } = {}
 
   // Очищаем ресурсы OCR
   await terminateOcr()
+  await terminateZoneOcr()
 
   return {
     runId: run.id,

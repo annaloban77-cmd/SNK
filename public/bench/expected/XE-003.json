@@ -1,0 +1,12 @@
+{
+  "code": "XE-003",
+  "sample": "XE-003",
+  "findings": [
+    {
+      "code": "R-SIGN-003",
+      "title": "Отсутствует подпись нормоконтролера",
+      "severity": "high",
+      "field": "Подписи"
+    }
+  ]
+}

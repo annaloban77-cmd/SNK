@@ -88,7 +88,18 @@ export async function parseCadFile(filePath: string, mimeType?: string): Promise
 
 // ============ DXF-парсер (основной, текстовый формат) ============
 function parseDxf(buf: Buffer): ParsedCadFile {
-  const text = buf.toString('latin1') // DXF часто в latin1
+  // DXF может быть в UTF-8 или windows-1251 (в зависимости от CAD-системы)
+  // Пробуем UTF-8 сначала, если не получается — latin1
+  let text: string
+  try {
+    text = buf.toString('utf-8')
+    // Проверяем, есть ли мусор от неправильной кодировки
+    if (text.includes('Ð') || text.includes('Â')) {
+      text = buf.toString('latin1')
+    }
+  } catch {
+    text = buf.toString('latin1')
+  }
   const lines = text.split(/\r?\n/)
   const warnings: string[] = []
   const attributes: CadAttribute[] = []
@@ -143,14 +154,18 @@ function parseDxf(buf: Buffer): ParsedCadFile {
     if (code === 0 && value === 'BLOCK') {
       currentBlock = { attributeDefs: [] }
     }
-    if (currentBlock && code === 2 && currentSection === 'BLOCKS') {
+    if (currentBlock && code === 2 && currentSection === 'BLOCKS' && !currentAttrDef) {
+      // Только если не внутри ATTDEF (code 2 в ATTDEF = tag, не имя блока)
       currentBlock.name = value.trim()
-      currentBlock.layer = ''
     }
     if (currentBlock && code === 8 && currentSection === 'BLOCKS') {
       currentBlock.layer = value.trim()
     }
     if (currentBlock && code === 0 && value === 'ATTDEF') {
+      // Сначала сохраняем предыдущий ATTDEF
+      if (currentAttrDef && currentAttrDef.tag) {
+        currentBlock.attributeDefs!.push(currentAttrDef as any)
+      }
       currentAttrDef = {}
     }
     if (currentAttrDef && code === 1) currentAttrDef.text = value?.trim()
@@ -212,6 +227,9 @@ function parseDxf(buf: Buffer): ParsedCadFile {
       if (entType === 'HATCH') geometry.hatchCount++
       if (entType === 'INSERT') geometry.insertCount++
     }
+    
+    // Гарантированное продвижение по парам код-значение
+    i += 2
   }
   
   // Извлечение атрибутов штампа из блоков
@@ -282,7 +300,7 @@ function extractStampFromBlocks(
         else if (/НАИМЕН|NAME|TITLE/.test(tag)) result.name = ad.text
         else if (/МАСС|MASS|WEIGHT/.test(tag)) result.mass = ad.text
         else if (/МАСШТАБ|SCALE/.test(tag)) result.scale = ad.text
-        else if (/МАТЕР|MATERIAL|MAT/.test(tag)) result.material = ad.text
+        else if (/^MATERIAL$|^МАТЕР/i.test(tag)) result.material = ad.text
         else if (/ЛИТЕР|LETTER/.test(tag)) result.letter = ad.text
         else if (/СТАДИ|STAGE/.test(tag)) result.stage = ad.text
         else if (/РАЗРАБ|DEVELOPED|AUTHOR/.test(tag)) result.developed = ad.text
@@ -526,6 +544,35 @@ function mapKompasPropToKey(prop: string): string {
 // Конвертация ParsedCadFile в StampFields для движка правил
 export function cadToStampFields(parsed: ParsedCadFile) {
   const s = parsed.stampAttributes
+
+  // Извлекаем ГОСТ ссылки и ТТ из TEXT entities (не только из ATTDEF)
+  const gostRefs: string[] = []
+  const ttItems: string[] = []
+  let inTtSection = false
+
+  for (const te of parsed.textEntities) {
+    // ГОСТ ссылки
+    const matches = [...te.text.matchAll(/ГОСТ\s+[\d.\-]+/gi)]
+    for (const m of matches) {
+      const ref = m[0].trim().replace(/\s+/g, ' ')
+      if (!gostRefs.includes(ref)) gostRefs.push(ref)
+    }
+
+    // Технические требования
+    if (/технические требования/i.test(te.text)) {
+      inTtSection = true
+      continue
+    }
+    // Перечень ГОСТ — заканчиваем секцию ТТ
+    if (/перечень применен/i.test(te.text)) {
+      inTtSection = false
+      continue
+    }
+    if (inTtSection && /^\d+[.:]/.test(te.text.trim())) {
+      ttItems.push(te.text.trim())
+    }
+  }
+
   return {
     format: s.format || null,
     designation: s.designation || null,
@@ -543,8 +590,8 @@ export function cadToStampFields(parsed: ParsedCadFile) {
     },
     dates: null,
     invNumber: null,
-    technicalRequirements: null,
-    gostReferences: null,
+    technicalRequirements: ttItems.length > 0 ? ttItems : null,
+    gostReferences: gostRefs.length > 0 ? gostRefs : null,
     documentType: parsed.format === 'sldasm' ? 'сборочный чертеж' : 'чертеж детали',
     sheetCount: null,
     notes: parsed.warnings.join('; '),

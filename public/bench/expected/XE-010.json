@@ -1,0 +1,12 @@
+{
+  "code": "XE-010",
+  "sample": "XE-010",
+  "findings": [
+    {
+      "code": "R-STAGE-001",
+      "title": "Стадия не указана",
+      "severity": "medium",
+      "field": "Стадия"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "code": "XE-001",
+  "sample": "XE-001",
+  "findings": [
+    {
+      "code": "R-MASS-001",
+      "title": "Лишняя точка после единицы массы",
+      "severity": "low",
+      "field": "Масса"
+    }
+  ]
+}

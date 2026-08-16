@@ -1,0 +1,12 @@
+{
+  "code": "XE-009",
+  "sample": "XE-009",
+  "findings": [
+    {
+      "code": "R-LETTER-001",
+      "title": "Литера не указана",
+      "severity": "medium",
+      "field": "Литера"
+    }
+  ]
+}

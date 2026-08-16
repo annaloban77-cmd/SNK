@@ -90,6 +90,7 @@ export async function runAnalyzePipeline(
 
   const startedAt = Date.now()
   const stages: StageLog[] = []
+  let pipelineConfidence = 1.0 // confidence для post-filter
 
   try {
     await db.document.update({ where: { id: documentId }, data: { status: 'processing' } })
@@ -108,6 +109,7 @@ export async function runAnalyzePipeline(
       try {
         const ocrResult = await extractStamp(doc.filePath, { useVlmFallback: runLlm })
         stamp = ocrResult.stamp as ExtractedStamp | null
+        pipelineConfidence = ocrResult.confidence
         const dur = Date.now() - ocrStart
         const msg = `OCR: ${ocrResult.method}, confidence=${(ocrResult.confidence*100).toFixed(0)}%`
         await logStage(documentId, 'ocr_extract', stamp ? 'success' : 'failed', dur, msg)
@@ -210,7 +212,10 @@ export async function runAnalyzePipeline(
 
     // Объединяем все результаты + применяем пост-фильтрацию (P5: детерминированность)
     const rawResults = [...geometryFindings, ...deterministicResults, ...llmResults]
-    const allResults = filterFindings(rawResults, { minConfidence: 0.4, dedupe: true, dropLowIfHighExists: true })
+    const allResults = filterFindings(rawResults, {
+      minConfidence: 0.4, dedupe: true, dropLowIfHighExists: true,
+      ocrConfidence: pipelineConfidence,
+    })
 
     if (allResults.length > 0) {
       const codes = Array.from(new Set(allResults.map((r) => r.code)))

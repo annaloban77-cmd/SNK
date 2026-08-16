@@ -180,6 +180,12 @@ export async function GET() {
     standardsCount,
     rulesCount,
     categoriesCount: categoriesCount.length,
+    // Business metrics (P5)
+    avgCheckTimeSec: avgCheckDurationMs ? Math.round(avgCheckDurationMs / 1000 * 10) / 10 : null,
+    firstTimePassRate: passRate,
+    totalChecks: analyzedDocuments,
+    estimatedHoursSaved: Math.round(analyzedDocuments * 0.5), // ~30 мин на документ экономии
+    estimatedCostSaved: Math.round(analyzedDocuments * 0.5 * 1500), // ~1500 руб/час нормоконтролёра
   }
 
   return NextResponse.json(stats)

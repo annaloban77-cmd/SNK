@@ -1,0 +1,262 @@
+[
+  {
+    "code": "X-001",
+    "title": "Кронштейн (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-002",
+    "title": "Фланец (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-003",
+    "title": "Опора (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-004",
+    "title": "Крышка (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-005",
+    "title": "Вал (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-006",
+    "title": "Втулка (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-007",
+    "title": "Обечайка (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-008",
+    "title": "Днище (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-009",
+    "title": "Переборка (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "X-010",
+    "title": "Палуба (DXF эталон)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "XE-001",
+    "title": "Шпангоут (DXF с ошибкой: R-MASS-001)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass"
+    ]
+  },
+  {
+    "code": "XE-002",
+    "title": "Стрингер (DXF с ошибкой: R-MAT-002)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "XE-003",
+    "title": "Карлингс (DXF с ошибкой: R-SIGN-003)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "XE-004",
+    "title": "Бимс (DXF с ошибкой: R-SIGN-004)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "XE-005",
+    "title": "Флор (DXF с ошибкой: R-SIGN-001)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "XE-006",
+    "title": "Пиллерс (DXF с ошибкой: R-STAMP-003)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "XE-007",
+    "title": "Брашпиль (DXF с ошибкой: R-SCALE-001)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "scale"
+    ]
+  },
+  {
+    "code": "XE-008",
+    "title": "Кнехт (DXF с ошибкой: R-MAT-001)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "XE-009",
+    "title": "Клюз (DXF с ошибкой: R-LETTER-001)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "letter"
+    ]
+  },
+  {
+    "code": "XE-010",
+    "title": "Рым (DXF с ошибкой: R-STAGE-001)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "dxf",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stage"
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "code": "XE-004",
+  "sample": "XE-004",
+  "findings": [
+    {
+      "code": "R-SIGN-004",
+      "title": "Отсутствует подпись утверждающего",
+      "severity": "medium",
+      "field": "Подписи"
+    }
+  ]
+}

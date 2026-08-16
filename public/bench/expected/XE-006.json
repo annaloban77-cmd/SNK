@@ -1,0 +1,12 @@
+{
+  "code": "XE-006",
+  "sample": "XE-006",
+  "findings": [
+    {
+      "code": "R-STAMP-003",
+      "title": "Отсутствует наименование изделия",
+      "severity": "high",
+      "field": "Наименование"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "code": "D-027",
+  "sample": "D-027",
+  "findings": [
+    {
+      "code": "R-STAGE-001",
+      "title": "Стадия не указана",
+      "severity": "medium",
+      "field": "Стадия",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

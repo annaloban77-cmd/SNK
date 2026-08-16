@@ -1,0 +1,14 @@
+{
+  "code": "D-026",
+  "sample": "D-026",
+  "findings": [
+    {
+      "code": "R-LETTER-001",
+      "title": "Литера не указана",
+      "severity": "medium",
+      "field": "Литера",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

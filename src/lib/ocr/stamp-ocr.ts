@@ -1,10 +1,10 @@
 // stamp-ocr.ts — извлечение полей штампа из изображений/SVG
 // Архитектура P5: детерминированный OCR вместо VLM
 //
-// Стратегия (по приоритету):
+// Фолбэк-цепочка (по приоритету):
 // 1. SVG-парсер (для bench-семплов) — 100% точно, мгновенно
-// 2. Tesseract.js (для реальных сканов) — быстрый локальный OCR
-// 3. VLM fallback (только если tesseract недоступен) — медленнее
+// 2. Zone-OCR (препроцессинг + кроп штампа + Tesseract per field) — для реальных/деградированных сканов
+// 3. VLM fallback (только крайний случай, логировать причину)
 
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
@@ -12,10 +12,12 @@ import type { StampFields } from '@/lib/types'
 
 export interface OcrResult {
   stamp: StampFields
-  method: 'svg' | 'tesseract' | 'vlm' | 'none'
+  method: 'svg' | 'zone-ocr' | 'tesseract' | 'vlm' | 'none'
   durationMs: number
   confidence: number // 0..1
   rawText?: string
+  preprocessing?: { skewAngle?: number; dpi?: number; formatMm?: { w: number; h: number } | null }
+  fieldMeta?: Record<string, { hasText: boolean; confidence: number; parsed: boolean }>
 }
 
 // Главный метод — выбрать лучший OCR по контексту
@@ -39,28 +41,32 @@ export async function extractStamp(
         rawText: `[SVG parsed: ${Object.keys(stamp).filter(k => stamp[k as keyof StampFields]).length} fields]`,
       }
     } catch (e) {
-      // fall through to tesseract
+      // fall through to zone-ocr
     }
   }
 
-  // 2. Tesseract.js для реальных изображений
+  // 2. Zone-OCR (препроцессинг + кроп штампа + Tesseract per field) — для реальных сканов
   try {
-    const tesseractResult = await extractStampWithTesseract(filePath)
-    if (tesseractResult) {
+    const { extractStampWithZoneOcr } = await import('./zone-ocr')
+    const result = await extractStampWithZoneOcr(filePath)
+    if (result.stamp && Object.keys(result.stamp).length > 0) {
       return {
-        stamp: tesseractResult.stamp,
-        method: 'tesseract',
+        stamp: result.stamp,
+        method: 'zone-ocr',
         durationMs: Date.now() - start,
-        confidence: tesseractResult.confidence,
-        rawText: tesseractResult.rawText,
+        confidence: result.confidence,
+        rawText: result.rawText,
+        preprocessing: result.preprocessing as any,
+        fieldMeta: result.fieldMeta,
       }
     }
   } catch (e) {
-    console.error('Tesseract OCR failed:', e)
+    console.error('Zone-OCR failed:', e)
   }
 
-  // 3. VLM fallback (опционально)
+  // 3. VLM fallback (только если запрошен — логировать причину)
   if (opts.useVlmFallback) {
+    console.warn('[OCR] Falling back to VLM — zone-OCR did not produce results')
     try {
       const { extractStampFromImage } = await import('@/lib/zai')
       const buf = await readFile(filePath)

@@ -1,0 +1,12 @@
+{
+  "code": "XE-007",
+  "sample": "XE-007",
+  "findings": [
+    {
+      "code": "R-SCALE-001",
+      "title": "Нестандартный масштаб",
+      "severity": "low",
+      "field": "Масштаб"
+    }
+  ]
+}

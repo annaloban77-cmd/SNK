@@ -1,0 +1,12 @@
+{
+  "code": "XE-005",
+  "sample": "XE-005",
+  "findings": [
+    {
+      "code": "R-SIGN-001",
+      "title": "Отсутствует подпись разработчика",
+      "severity": "high",
+      "field": "Подписи"
+    }
+  ]
+}

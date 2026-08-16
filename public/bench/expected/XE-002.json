@@ -1,0 +1,12 @@
+{
+  "code": "XE-002",
+  "sample": "XE-002",
+  "findings": [
+    {
+      "code": "R-MAT-002",
+      "title": "В обозначении материала нет ГОСТ",
+      "severity": "medium",
+      "field": "Материал"
+    }
+  ]
+}
