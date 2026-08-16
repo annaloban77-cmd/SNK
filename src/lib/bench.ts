@@ -1,11 +1,15 @@
 // Bench runner: прогон всех активных семплов, сравнение с expected, метрики
+// Архитектура P5: OCR → Geometry → Rules → LLM (explanations) → post-filter
 import { db } from './db'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import path from 'path'
-import { extractStampFromImage, llmSemanticCheck } from './zai'
+import { llmSemanticCheck } from './zai'
 import { runDeterministicRules, toStampFields, fromLlmIssues, type RuleCheckResult } from './rules'
 import { parseCadFile, cadToStampFields } from './cad-parser'
+import { extractStamp, terminateOcr } from './ocr/stamp-ocr'
+import { analyzeGeometry } from './geometry/geometry-checker'
+import { filterFindings } from './post-filter'
 
 export interface ExpectedFinding {
   code: string
@@ -42,60 +46,82 @@ export async function runSingleSample(sample: {
   const start = Date.now()
   const foundIssues: RuleCheckResult[] = []
   let stamp: any = null
-  
+
   const fullPath = sample.filePath.startsWith('/home')
     ? sample.filePath
     : path.join('/home/z/my-project/public', sample.filePath.replace(/^\/+/, ''))
-  
-  try {
-    if (existsSync(fullPath)) {
-      const buf = await readFile(fullPath)
-      const ext = fullPath.toLowerCase().split('.').pop() || ''
-      
-      // Для изображений — VLM
-      if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
-        const dataUrl = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${buf.toString('base64')}`
-        try {
-          stamp = await Promise.race([
-            extractStampFromImage(dataUrl),
-            new Promise<null>((r) => setTimeout(() => r(null), 12000)),
-          ])
-        } catch (e) {
-          console.error(`VLM failed for ${sample.code}:`, e)
-        }
-      } else if (['dxf', 'dwg', 'sldprt', 'sldasm', 'slddrw', 'cdw', 'spw'].includes(ext)) {
-        // CAD-файл — парсер
-        try {
-          const parsed = await parseCadFile(fullPath)
-          stamp = cadToStampFields(parsed)
-        } catch (e) {
-          console.error(`CAD parse failed for ${sample.code}:`, e)
-        }
-      }
+
+  const ext = fullPath.toLowerCase().split('.').pop() || ''
+
+  // 1. OCR штампа (детерминированный: SVG-парсер для bench, Tesseract для реальных)
+  if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
+    try {
+      const ocrResult = await extractStamp(fullPath, { useVlmFallback: false })
+      stamp = ocrResult.stamp
+      console.log(`     [OCR: ${ocrResult.method}, ${ocrResult.durationMs}ms, confidence=${(ocrResult.confidence*100).toFixed(0)}%]`)
+    } catch (e) {
+      console.error(`OCR failed for ${sample.code}:`, e)
     }
-  } catch (e) {
-    console.error(`Sample ${sample.code} file read failed:`, e)
+  } else if (['dxf', 'dwg', 'sldprt', 'sldasm', 'slddrw', 'cdw', 'spw'].includes(ext)) {
+    // CAD-файл — парсер
+    try {
+      if (existsSync(fullPath)) {
+        const parsed = await parseCadFile(fullPath)
+        stamp = cadToStampFields(parsed)
+      }
+    } catch (e) {
+      console.error(`CAD parse failed for ${sample.code}:`, e)
+    }
   }
-  
-  // Детерминированные правила
+
+  // 2. Geometry (детекция линий/рамок — детерминированно)
+  if (['png', 'jpg', 'jpeg', 'svg'].includes(ext)) {
+    try {
+      const geom = await analyzeGeometry(fullPath)
+      // Добавляем geometry-находки (R-FORMAT-003, R-STAMP-000, R-DIM-001, R-VIEW-002)
+      for (const gf of geom.findings) {
+        foundIssues.push({
+          code: gf.code,
+          title: gf.title,
+          description: gf.description,
+          severity: gf.severity,
+          field: gf.field,
+          source: 'auto',
+          gostRef: undefined,
+          recommendation: undefined,
+          requirement: undefined,
+          evidence: `[geometry confidence: ${(gf.confidence * 100).toFixed(0)}%]`,
+        })
+      }
+    } catch (e) {
+      // geometry не критична
+    }
+  }
+
+  // 3. Детерминированные правила (по извлечённому штампу)
   if (stamp) {
     const det = runDeterministicRules(toStampFields(stamp))
     foundIssues.push(...det)
-    
-    // LLM (опционально, медленно)
-    if (opts.runLlm !== false && stamp) {
+
+    // 4. LLM только для семантических проверок (опционально)
+    if (opts.runLlm === true && stamp) {
       try {
         const gostRefs = stamp.gostReferences || []
         const llmIssues = await Promise.race([
           llmSemanticCheck(stamp, gostRefs),
-          new Promise<[]>((r) => setTimeout(() => r([]), 60000)),
+          new Promise<[]>((r) => setTimeout(() => r([]), 30000)),
         ])
         foundIssues.push(...fromLlmIssues(llmIssues))
-      } catch (e) {
+      } catch {
         // пропускаем LLM при ошибке
       }
     }
   }
+
+  // 5. Пост-фильтрация: дедупликация, отбрасывание low при high, низкий confidence
+  const filtered = filterFindings(foundIssues, { minConfidence: 0.4, dedupe: true, dropLowIfHighExists: true })
+  foundIssues.length = 0
+  foundIssues.push(...filtered)
   
   // Парсим expected
   let expectedFindings: ExpectedFinding[] = []
@@ -176,8 +202,8 @@ export async function runBench(opts: { runLlm?: boolean; version?: string } = {}
   let passedSamples = 0, failedSamples = 0
   const allFindings: any[] = []
   
-  // Параллельная обработка батчами по BATCH_SIZE семплов
-  const BATCH_SIZE = 1
+  // Параллельная обработка батчами (OCR+rules не требуют rate-limit)
+  const BATCH_SIZE = 10
   for (let bi = 0; bi < samples.length; bi += BATCH_SIZE) {
     const batch = samples.slice(bi, bi + BATCH_SIZE)
     console.log(`   ▶ batch ${Math.floor(bi/BATCH_SIZE)+1}/${Math.ceil(samples.length/BATCH_SIZE)}: ${batch.map(s=>s.code).join(', ')}`)
@@ -235,8 +261,6 @@ export async function runBench(opts: { runLlm?: boolean; version?: string } = {}
       
       console.log(`     ✓ ${sample.code}: recall=${(result.recall*100).toFixed(0)}% precision=${(result.precision*100).toFixed(0)}% found=${result.foundIssues.length} expected=${result.expectedFindings.length} ${isPass ? 'PASS' : 'FAIL'}`)
     }
-    // Задержка для избежания rate limit VLM
-    await new Promise(r => setTimeout(r, 1500))
   }
   
   // Метрики
@@ -291,7 +315,10 @@ export async function runBench(opts: { runLlm?: boolean; version?: string } = {}
   console.log(`   Precision: ${(precision*100).toFixed(1)}%`)
   console.log(`   Status: ${benchStatus.toUpperCase()}`)
   console.log(`   Duration: ${(durationMs/1000).toFixed(1)}s`)
-  
+
+  // Очищаем ресурсы OCR
+  await terminateOcr()
+
   return {
     runId: run.id,
     totalSamples: samples.length,

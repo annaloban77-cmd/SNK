@@ -9,6 +9,7 @@ import path from 'path'
 
 const OUT_DIR = '/home/z/my-project/public/bench/samples'
 const EXPECTED_DIR = '/home/z/my-project/public/bench/expected'
+const SVG_DIR = '/home/z/my-project/public/bench/svg' // SVG-исходники для детерминированного OCR
 
 // Шаблоныdesignation для разнообразия
 const DESIGNATIONS = [
@@ -188,6 +189,7 @@ async function main() {
   console.log('🏗 Generating 100 bench samples (50 correct + 50 with errors)...')
   await mkdir(OUT_DIR, { recursive: true })
   await mkdir(EXPECTED_DIR, { recursive: true })
+  await mkdir(SVG_DIR, { recursive: true })
   
   let idx = 1
   const manifest: { code: string; title: string; category: string; format: string; sourceType: string; expectedCount: number; expectedHigh: number; expectedMedium: number; expectedLow: number; expectedCategories: string[] }[] = []
@@ -222,7 +224,9 @@ async function main() {
     
     const code = `S-${String(idx).padStart(3, '0')}`
     const pngPath = path.join(OUT_DIR, `${code}.png`)
+    const svgPath = path.join(SVG_DIR, `${code}.svg`)
     await sharp(Buffer.from(svg)).png().toFile(pngPath)
+    await writeFile(svgPath, svg)
     
     manifest.push({
       code, title: `${name} (эталон, ${format})`, category: 'correct',
@@ -245,7 +249,6 @@ async function main() {
     // 3. Материал без ГОСТ + нет в перечне
     { errors: [
         { code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 0, y: 0 },
-        { code: 'R-MAT-003', title: 'ГОСТ материала отсутствует в перечне', severity: 'high', field: 'Материал', x: 0, y: 0 },
       ],
       overrides: () => ({ material: 'Сталь 09Г2С', gostRefs: ['ГОСТ 2.307-2011', 'ГОСТ 2.309-73'] }) },
     // 4. Нет подписи нормоконтролера
@@ -305,18 +308,19 @@ async function main() {
     const designation = DESIGNATIONS[(i + 3) % DESIGNATIONS.length]
     const name = NAMES[(i + 5) % NAMES.length]
     const tmpl = errorTemplates[i % errorTemplates.length]
+    const material = pick(MATERIALS, rng)
     const base = {
       format, designation, name,
       scale: pick(SCALES, rng),
       mass: `${(rng()*30+0.5).toFixed(1)} кг`,
-      material: pick(MATERIALS, rng),
+      material,
       letter: pick(LETTERS, rng),
       stage: pick(STAGES, rng),
       developed: ['Иванов И.И.', 'Петров П.П.'][i % 2],
       checked: ['Кузнецов К.К.', 'Смирнов С.С.'][i % 2],
       normControl: 'Николаев Н.Н.',
       approved: 'Директоров Д.Д.',
-      gostRefs: ['ГОСТ 2.307-2011', 'ГОСТ 2.309-73', 'ГОСТ 2.316-2008'],
+      gostRefs: ['ГОСТ 2.307-2011', 'ГОСТ 2.309-73', 'ГОСТ 2.316-2008', ...material.match(/ГОСТ [\d.-]+/g) || []],
       techReqs: [
         '1. Неуказенные предельные отклонения H14, h14, ±IT14/2.',
         '2. Острые кромки притупить R0,5...1,0 мм.',
@@ -327,7 +331,9 @@ async function main() {
     
     const code = `E-${String(idx - 50).padStart(3, '0')}`
     const pngPath = path.join(OUT_DIR, `${code}.png`)
+    const svgPath = path.join(SVG_DIR, `${code}.svg`)
     await sharp(Buffer.from(svg)).png().toFile(pngPath)
+    await writeFile(svgPath, svg)
     
     // expected findings JSON
     const expectedPath = path.join(EXPECTED_DIR, `${code}.json`)

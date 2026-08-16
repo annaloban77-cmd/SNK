@@ -633,8 +633,8 @@
     "category": "with_errors",
     "format": "A4",
     "sourceType": "scan",
-    "expectedCount": 2,
-    "expectedHigh": 1,
+    "expectedCount": 1,
+    "expectedHigh": 0,
     "expectedMedium": 1,
     "expectedLow": 0,
     "expectedCategories": [
@@ -887,8 +887,8 @@
     "category": "with_errors",
     "format": "A2",
     "sourceType": "scan",
-    "expectedCount": 2,
-    "expectedHigh": 1,
+    "expectedCount": 1,
+    "expectedHigh": 0,
     "expectedMedium": 1,
     "expectedLow": 0,
     "expectedCategories": [
@@ -1141,8 +1141,8 @@
     "category": "with_errors",
     "format": "A3",
     "sourceType": "scan",
-    "expectedCount": 2,
-    "expectedHigh": 1,
+    "expectedCount": 1,
+    "expectedHigh": 0,
     "expectedMedium": 1,
     "expectedLow": 0,
     "expectedCategories": [

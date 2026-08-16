@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1414" viewBox="0 0 1000 1414" font-family="Arial, sans-serif">
+  <rect width="1000" height="1414" fill="#ffffff"/>
+  <rect x="20" y="20" width="960" height="1374" fill="none" stroke="#000" stroke-width="2"/>
+  
+  <!-- Геометрические проекции -->
+  
+  <g transform="translate(150, 212.1)">
+    <circle cx="150" cy="100" r="60" fill="none" stroke="#000" stroke-width="1.5"/>
+    <rect x="50" y="50" width="200" height="120" fill="none" stroke="#000" stroke-width="1.5"/>
+    <line x1="50" y1="110" x2="250" y2="110" stroke="#000" stroke-width="0.5" stroke-dasharray="10,3,2,3"/>
+    <line x1="150" y1="50" x2="150" y2="220" stroke="#000" stroke-width="0.5" stroke-dasharray="10,3,2,3"/>
+    
+    <line x1="50" y1="240" x2="250" y2="240" stroke="#000" stroke-width="0.5"/>
+    <line x1="50" y1="235" x2="50" y2="245" stroke="#000" stroke-width="0.5"/>
+    <line x1="250" y1="235" x2="250" y2="245" stroke="#000" stroke-width="0.5"/>
+    <text x="150" y="258" font-size="14" text-anchor="middle">200</text>
+    
+  </g>
+  
+  
+  <!-- Сварные швы (если есть) -->
+  
+  
+  <!-- Технические требования -->
+  <g transform="translate(100, 777.7)">
+    <text x="0" y="0" font-size="16" font-weight="bold">Технические требования</text>
+    <text x="0" y="25" font-size="13">1. Неуказенные предельные отклонения H14, h14, ±IT14/2.</text><text x="0" y="45" font-size="13">2. Острые кромки притупить R0,5...1,0 мм.</text><text x="0" y="65" font-size="13">3. Покрытие: грунт ГФ-017, эмаль ПФ-115.</text>
+  </g>
+  
+  <!-- Перечень ГОСТ -->
+  <g transform="translate(600, 777.7)">
+    <text x="0" y="0" font-size="14" font-weight="bold">Перечень применённых стандартов:</text>
+    <text x="0" y="20" font-size="12">- ГОСТ 2.307-2011</text><text x="0" y="36" font-size="12">- ГОСТ 2.309-73</text><text x="0" y="52" font-size="12">- ГОСТ 2.316-2008</text><text x="0" y="68" font-size="12">- ГОСТ 1050-2013</text>
+  </g>
+  
+  <!-- Штамп ГОСТ 2.104 форма 1 (185×55 мм, масштабируем) -->
+  <g transform="translate(640, 1214)">
+    <rect x="0" y="0" width="340" height="180" fill="none" stroke="#000" stroke-width="1.5"/>
+    <!-- Внутренние линии -->
+    <line x1="0" y1="30" x2="340" y2="30" stroke="#000" stroke-width="0.7"/>
+    <line x1="0" y1="60" x2="340" y2="60" stroke="#000" stroke-width="0.7"/>
+    <line x1="0" y1="90" x2="340" y2="90" stroke="#000" stroke-width="0.7"/>
+    <line x1="0" y1="120" x2="340" y2="120" stroke="#000" stroke-width="0.7"/>
+    <line x1="0" y1="150" x2="340" y2="150" stroke="#000" stroke-width="0.7"/>
+    <line x1="120" y1="0" x2="120" y2="150" stroke="#000" stroke-width="0.7"/>
+    <line x1="220" y1="0" x2="220" y2="150" stroke="#000" stroke-width="0.7"/>
+    <line x1="280" y1="0" x2="280" y2="150" stroke="#000" stroke-width="0.7"/>
+    <line x1="170" y1="150" x2="170" y2="180" stroke="#000" stroke-width="0.7"/>
+    
+    <!-- Метки полей -->
+    <text x="5" y="20" font-size="9" fill="#666">Изм.</text>
+    <text x="125" y="20" font-size="9" fill="#666">Лист</text>
+    <text x="225" y="20" font-size="9" fill="#666">№ докум.</text>
+    <text x="285" y="20" font-size="9" fill="#666">Подп.</text>
+    <text x="5" y="50" font-size="9" fill="#666">Разраб.</text>
+    <text x="5" y="80" font-size="9" fill="#666">Пров.</text>
+    <text x="5" y="110" font-size="9" fill="#666">Н.контр.</text>
+    <text x="5" y="140" font-size="9" fill="#666">Утв.</text>
+    
+    <!-- Подписи (значения) -->
+    <text x="125" y="50" font-size="11">Иванов И.И.</text>
+    <text x="125" y="80" font-size="11">Кузнецов К.К.</text>
+    <text x="125" y="110" font-size="11">Николаев Н.Н.</text>
+    <text x="125" y="140" font-size="11">Директоров Д.Д.</text>
+    
+    <!-- Обозначение (крупно) -->
+    <text x="10" y="170" font-size="14" font-weight="bold">АБВ.301455.012</text>
+    
+    <!-- Наименование в центре штампа -->
+    <text x="180" y="165" font-size="11">Крышка</text>
+    <text x="180" y="178" font-size="9" fill="#666">A4 · 1:1 · 14.4 кг · Сталь 20 ГОСТ 1050-2013</text>
+    <text x="180" y="178" font-size="9" fill="#666">Лит. В · Стадия РП</text>
+  </g>
+</svg>

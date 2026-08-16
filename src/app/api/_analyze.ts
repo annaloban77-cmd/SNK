@@ -1,9 +1,13 @@
 // Shared analyze pipeline — used by /api/documents/[id]/analyze and /api/samples/[id]/analyze
+// Архитектура P5: OCR → Geometry → Rules → LLM (explanations) → post-filter
 import { db } from '@/lib/db'
 import { logAudit } from '@/lib/audit'
 import { mapIssue, parseStamp } from './_map'
-import { extractStampFromImage, llmSemanticCheck, type ExtractedStamp } from '@/lib/zai'
+import { llmSemanticCheck, type ExtractedStamp } from '@/lib/zai'
 import { runDeterministicRules, toStampFields, fromLlmIssues, type RuleCheckResult } from '@/lib/rules'
+import { extractStamp } from '@/lib/ocr/stamp-ocr'
+import { analyzeGeometry } from '@/lib/geometry/geometry-checker'
+import { filterFindings } from '@/lib/post-filter'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import sharp from 'sharp'
@@ -98,18 +102,16 @@ export async function runAnalyzePipeline(
     }
 
     let stamp: ExtractedStamp | null = null
-    if (dataUrl) {
-      const vlmStart = Date.now()
+    // 1. OCR штампа (детерминированный: SVG/Tesseract, VLM только как fallback)
+    if (doc.filePath && existsSync(doc.filePath)) {
+      const ocrStart = Date.now()
       try {
-        stamp = await timeout(extractStampFromImage(dataUrl), TIMEOUT_MS, 'VLM extract')
-        const dur = Date.now() - vlmStart
-        await logStage(documentId, 'vlm_extract', stamp ? 'success' : 'failed', dur, stamp ? undefined : 'VLM вернул null')
-        stages.push({
-          stage: 'vlm_extract',
-          status: stamp ? 'success' : 'failed',
-          durationMs: dur,
-          message: stamp ? undefined : 'VLM вернул null',
-        })
+        const ocrResult = await extractStamp(doc.filePath, { useVlmFallback: runLlm })
+        stamp = ocrResult.stamp as ExtractedStamp | null
+        const dur = Date.now() - ocrStart
+        const msg = `OCR: ${ocrResult.method}, confidence=${(ocrResult.confidence*100).toFixed(0)}%`
+        await logStage(documentId, 'ocr_extract', stamp ? 'success' : 'failed', dur, msg)
+        stages.push({ stage: 'ocr_extract', status: stamp ? 'success' : 'failed', durationMs: dur, message: msg })
         if (stamp) {
           await db.document.update({
             where: { id: documentId },
@@ -117,23 +119,47 @@ export async function runAnalyzePipeline(
           })
         }
       } catch (e) {
-        const dur = Date.now() - vlmStart
+        const dur = Date.now() - ocrStart
         const msg = e instanceof Error ? e.message : String(e)
-        await logStage(documentId, 'vlm_extract', 'failed', dur, msg)
-        stages.push({ stage: 'vlm_extract', status: 'failed', durationMs: dur, message: msg })
+        await logStage(documentId, 'ocr_extract', 'failed', dur, msg)
+        stages.push({ stage: 'ocr_extract', status: 'failed', durationMs: dur, message: msg })
       }
     } else if (doc.stampJson) {
       try {
         stamp = JSON.parse(doc.stampJson) as ExtractedStamp
-        await logStage(documentId, 'vlm_extract', 'success', 0, 'Использован ранее извлечённый штамп')
-        stages.push({ stage: 'vlm_extract', status: 'success', durationMs: 0, message: 'Использован ранее извлечённый штамп' })
+        await logStage(documentId, 'ocr_extract', 'success', 0, 'Использован ранее извлечённый штамп')
+        stages.push({ stage: 'ocr_extract', status: 'success', durationMs: 0, message: 'Использован ранее извлечённый штамп' })
       } catch {
-        await logStage(documentId, 'vlm_extract', 'failed', 0, 'Файл отсутствует, штамп не извлечён')
-        stages.push({ stage: 'vlm_extract', status: 'failed', durationMs: 0, message: 'Файл отсутствует' })
+        await logStage(documentId, 'ocr_extract', 'failed', 0, 'Файл отсутствует, штамп не извлечён')
+        stages.push({ stage: 'ocr_extract', status: 'failed', durationMs: 0, message: 'Файл отсутствует' })
       }
     } else {
-      await logStage(documentId, 'vlm_extract', 'failed', 0, 'Файл отсутствует, источник — CAD')
-      stages.push({ stage: 'vlm_extract', status: 'failed', durationMs: 0, message: 'Файл отсутствует' })
+      await logStage(documentId, 'ocr_extract', 'failed', 0, 'Файл отсутствует, источник — CAD')
+      stages.push({ stage: 'ocr_extract', status: 'failed', durationMs: 0, message: 'Файл отсутствует' })
+    }
+
+    // 2. Geometry (детекция линий/рамок — детерминированно)
+    const geometryFindings: RuleCheckResult[] = []
+    if (doc.filePath && existsSync(doc.filePath)) {
+      const geomStart = Date.now()
+      try {
+        const geom = await analyzeGeometry(doc.filePath)
+        const dur = Date.now() - geomStart
+        for (const gf of geom.findings) {
+          geometryFindings.push({
+            code: gf.code, title: gf.title, description: gf.description,
+            severity: gf.severity, field: gf.field, source: 'auto',
+            gostRef: undefined, recommendation: undefined, requirement: undefined,
+            evidence: `[geometry confidence: ${(gf.confidence*100).toFixed(0)}%]`,
+          })
+        }
+        await logStage(documentId, 'geometry', 'success', dur, `${geom.findings.length} findings`)
+        stages.push({ stage: 'geometry', status: 'success', durationMs: dur, message: `${geom.findings.length} findings` })
+      } catch (e) {
+        const dur = Date.now() - geomStart
+        await logStage(documentId, 'geometry', 'failed', dur)
+        stages.push({ stage: 'geometry', status: 'failed', durationMs: dur })
+      }
     }
 
     let deterministicResults: RuleCheckResult[] = []
@@ -182,7 +208,9 @@ export async function runAnalyzePipeline(
 
     await db.issue.deleteMany({ where: { documentId } })
 
-    const allResults = [...deterministicResults, ...llmResults]
+    // Объединяем все результаты + применяем пост-фильтрацию (P5: детерминированность)
+    const rawResults = [...geometryFindings, ...deterministicResults, ...llmResults]
+    const allResults = filterFindings(rawResults, { minConfidence: 0.4, dedupe: true, dropLowIfHighExists: true })
 
     if (allResults.length > 0) {
       const codes = Array.from(new Set(allResults.map((r) => r.code)))
