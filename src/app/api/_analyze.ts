@@ -103,8 +103,36 @@ export async function runAnalyzePipeline(
     }
 
     let stamp: ExtractedStamp | null = null
-    // 1. OCR штампа (детерминированный: SVG/Tesseract, VLM только как fallback)
-    if (doc.filePath && existsSync(doc.filePath)) {
+    // 1. Извлечение штампа: OCR для изображений, CAD-парсер для CAD-файлов
+    const fileExt = doc.filePath.toLowerCase().split('.').pop() || ''
+    const isCadFile = ['dxf', 'dwg', 'sldprt', 'sldasm', 'slddrw', 'cdw', 'spw'].includes(fileExt)
+    const isImageFile = ['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(fileExt)
+
+    if (isCadFile && doc.filePath && existsSync(doc.filePath)) {
+      // CAD-файл — используем CAD-парсер (детерминированный, confidence=1.0)
+      const cadStart = Date.now()
+      try {
+        const { parseCadFile, cadToStampFields } = await import('@/lib/cad-parser')
+        const parsed = await parseCadFile(doc.filePath)
+        stamp = cadToStampFields(parsed) as unknown as ExtractedStamp
+        pipelineConfidence = 1.0
+        const dur = Date.now() - cadStart
+        const msg = `CAD: ${parsed.format}, ${parsed.attributes.length} attrs, ${parsed.textEntities.length} texts`
+        await logStage(documentId, 'ocr_extract', stamp ? 'success' : 'failed', dur, msg)
+        stages.push({ stage: 'ocr_extract', status: stamp ? 'success' : 'failed', durationMs: dur, message: msg })
+        if (stamp) {
+          await db.document.update({
+            where: { id: documentId },
+            data: { stampJson: JSON.stringify(stamp) },
+          })
+        }
+      } catch (e) {
+        const dur = Date.now() - cadStart
+        const msg = e instanceof Error ? e.message : String(e)
+        await logStage(documentId, 'ocr_extract', 'failed', dur, msg)
+        stages.push({ stage: 'ocr_extract', status: 'failed', durationMs: dur, message: msg })
+      }
+    } else if (isImageFile && doc.filePath && existsSync(doc.filePath)) {
       const ocrStart = Date.now()
       try {
         const ocrResult = await extractStamp(doc.filePath, { useVlmFallback: runLlm })
@@ -140,9 +168,9 @@ export async function runAnalyzePipeline(
       stages.push({ stage: 'ocr_extract', status: 'failed', durationMs: 0, message: 'Файл отсутствует' })
     }
 
-    // 2. Geometry (детекция линий/рамок — детерминированно)
+    // 2. Geometry (детекция линий/рамок — только для изображений/SVG, не для CAD)
     const geometryFindings: RuleCheckResult[] = []
-    if (doc.filePath && existsSync(doc.filePath)) {
+    if (isImageFile && doc.filePath && existsSync(doc.filePath)) {
       const geomStart = Date.now()
       try {
         const geom = await analyzeGeometry(doc.filePath)

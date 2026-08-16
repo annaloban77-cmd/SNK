@@ -335,7 +335,7 @@ function extractStampFromBlocks(
   return result
 }
 
-// ============ DWG-парсер (минимальный — заголовок) ============
+// ============ DWG-парсер (минимальный — заголовок + текст) ============
 function parseDwg(buf: Buffer): ParsedCadFile {
   const warnings: string[] = []
   const attributes: CadAttribute[] = []
@@ -350,26 +350,48 @@ function parseDwg(buf: Buffer): ParsedCadFile {
     'AC1032': 'AutoCAD 2018+',
   }
   const software = verMap[verBytes] || `Unknown DWG (${verBytes})`
-  
-  // Поищем текстовые строки в бинарнике (могут быть имена слоёв, атрибуты)
+
+  // DWG (AC1021+) хранит текст в UTF-16LE. Ищем UTF-16LE строки.
+  // Также ищем ASCII строки (имена слоёв, блоков и т.д.)
   const textStrings: string[] = []
+
+  // 1. UTF-16LE строки: ищем последовательности printable UTF-16LE символов
+  let utf16Buf = ''
+  for (let i = 0; i < buf.length - 1; i += 2) {
+    const lo = buf[i]
+    const hi = buf[i + 1]
+    // Printable: кириллица (0x0410-0x044F), латиница (0x0020-0x007E), цифры
+    if (hi === 0x00 && lo >= 0x20 && lo < 0x7f) {
+      utf16Buf += String.fromCharCode(lo)
+    } else if (hi === 0x04 && lo >= 0x10 && lo <= 0x4f) {
+      // Кириллица UTF-16LE: 0x0410 (А) - 0x044F (я)
+      utf16Buf += String.fromCharCode(0x0400 + lo)
+    } else {
+      if (utf16Buf.length >= 4) textStrings.push(utf16Buf)
+      utf16Buf = ''
+    }
+  }
+  if (utf16Buf.length >= 4) textStrings.push(utf16Buf)
+
+  // 2. ASCII строки (для старых DWG или имён слоёв/блоков)
   let strBuf = ''
-  for (let i = 0; i < Math.min(buf.length, 50000); i++) {
+  for (let i = 0; i < Math.min(buf.length, 100000); i++) {
     const b = buf[i]
     if (b >= 0x20 && b < 0x7f) {
       strBuf += String.fromCharCode(b)
     } else if (b >= 0xC0 && b < 0xFF) {
-      // UTF-8 multibyte — пропустим для простоты
-      strBuf += '?'
+      // Windows-1251 кириллица
+      strBuf += Buffer.from([b]).toString('latin1')
     } else {
       if (strBuf.length >= 4) textStrings.push(strBuf)
       strBuf = ''
     }
   }
   if (strBuf.length >= 4) textStrings.push(strBuf)
-  
-  // Поищем обозначение, масштаб, формат в строках
+
+  // Поищем обозначение, масштаб, формат, ГОСТ в строках
   const stampAttributes: Record<string, string> = {}
+  const gostRefs: string[] = []
   for (const s of textStrings) {
     if (!stampAttributes.designation && /^[А-ЯA-Z0-9]{2,6}\.[А-ЯA-Z0-9]{4,8}\.[А-ЯA-Z0-9]{2,4}/.test(s)) {
       stampAttributes.designation = s
@@ -383,10 +405,51 @@ function parseDwg(buf: Buffer): ParsedCadFile {
       stampAttributes.format = s.trim().toUpperCase()
       attributes.push({ key: 'format', value: s.trim().toUpperCase(), source: 'metadata' })
     }
+    // ГОСТ ссылки
+    const matches = [...s.matchAll(/ГОСТ\s+[\d.\-]+/gi)]
+    for (const m of matches) {
+      const ref = m[0].trim().replace(/\s+/g, ' ')
+      if (!gostRefs.includes(ref)) gostRefs.push(ref)
+    }
   }
-  
-  warnings.push('DWG — бинарный формат, извлечены только метаданные заголовка. Для полного разбора требуется ODA SDK или экспорт в DXF.')
-  
+  if (gostRefs.length > 0) stampAttributes.gostReferences = gostRefs.join('; ')
+
+  // Сохраняем все текстовые строки как attributes (для отображения в UI)
+  for (const s of textStrings.slice(0, 100)) {
+    if (s.length >= 4 && s.length < 500) {
+      attributes.push({ key: 'text', value: s, source: 'metadata' })
+    }
+  }
+
+  // Извлекаем метаданные из UTF-16 строк (автор, программа, дата)
+  for (const s of textStrings) {
+    if (/last saved by/i.test(s)) {
+      const m = s.match(/by\s+(?:an\s+Autodesk\s+application\s+or\s+Autodesk\s+licensed\s+application\.?\s*)?/)
+      // Автора ищем в prop_set
+    }
+    // <prop id="8"><string>kolobkov</string> — автор
+    const authorMatch = s.match(/<prop id="8"><string>([^<]+)<\/string>/)
+    if (authorMatch && !stampAttributes.developed) {
+      stampAttributes.developed = authorMatch[1]
+    }
+    // <prop id="258"><string>AutoCAD 2009</string> — программа
+    const progMatch = s.match(/<prop id="258"><string>([^<]+)<\/string>/)
+    if (progMatch) {
+      attributes.push({ key: 'program', value: progMatch[1], source: 'metadata' })
+    }
+    // <datetime>2012-06-05T13:10:59</datetime> — дата
+    const dateMatch = s.match(/<datetime>([^<]+)<\/datetime>/)
+    if (dateMatch && !stampAttributes.date) {
+      stampAttributes.date = dateMatch[1]
+    }
+    // Наименование документа из имени файла
+    if (/PDV|динамич/i.test(s) && !stampAttributes.name) {
+      // Не берём мусор, только осмысленные строки
+    }
+  }
+
+  warnings.push('DWG — бинарный формат (AC1021+), извлечены метаданные и текстовые строки. Секции данных сжаты (LZ77). Для полного разбора геометрии и штампа требуется ODA SDK или экспорт в DXF.')
+
   return {
     format: 'dwg',
     stampAttributes,
@@ -394,7 +457,7 @@ function parseDwg(buf: Buffer): ParsedCadFile {
     geometry: { entities: 0, lines: 0, circles: 0, arcs: 0, polylines: 0, texts: 0, dimensions: 0, hatchCount: 0, insertCount: 0 },
     layers: [],
     blocks: [],
-    textEntities: [],
+    textEntities: textStrings.slice(0, 50).map((t, i) => ({ text: t, x: 0, y: 0, layer: 'metadata' })),
     metadata: { fileSize: buf.length, software, version: verBytes },
     warnings,
   }
@@ -573,6 +636,18 @@ export function cadToStampFields(parsed: ParsedCadFile) {
     }
   }
 
+  // Если gostReferences есть в stampAttributes (DWG — строка через ; ), парсим
+  if (s.gostReferences && gostRefs.length === 0) {
+    const refs = s.gostReferences.split(';').map(r => r.trim()).filter(Boolean)
+    gostRefs.push(...refs)
+  }
+
+  // Извлекаем дату из stampAttributes (DWG metadata)
+  let dates: { developed?: string | null; checked?: string | null; approved?: string | null } | null = null
+  if (s.date) {
+    dates = { developed: s.date, checked: null, approved: null }
+  }
+
   return {
     format: s.format || null,
     designation: s.designation || null,
@@ -588,7 +663,7 @@ export function cadToStampFields(parsed: ParsedCadFile) {
       normControl: s.normControl || null,
       approved: s.approved || null,
     },
-    dates: null,
+    dates,
     invNumber: null,
     technicalRequirements: ttItems.length > 0 ? ttItems : null,
     gostReferences: gostRefs.length > 0 ? gostRefs : null,
