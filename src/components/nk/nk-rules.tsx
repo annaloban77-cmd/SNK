@@ -294,7 +294,7 @@ function RuleRow({
         <SeverityBadge severity={rule.severity} />
       </TableCell>
       <TableCell className="text-xs font-mono">
-        {rule.gostRef ?? '—'}
+        {rule.gostField ?? '—'}
       </TableCell>
       <TableCell className="text-xs">
         {rule.standard ? (

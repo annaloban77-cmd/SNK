@@ -1,4 +1,5 @@
-import type { StampFields, Severity, LlmIssueInput } from './types'
+import type { StampFields, Severity } from './types'
+import type { LlmIssueInput } from './zai'
 import type { ExtractedStamp } from './zai'
 
 // Результат проверки одного правила

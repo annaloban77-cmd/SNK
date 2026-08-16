@@ -58,6 +58,8 @@ model Document {
   docTypeId     String?
   docType       DocType? @relation(fields: [docTypeId], references: [id])
   project       Project? @relation(fields: [projectId], references: [id])
+  organizationId String?
+  organization  Organization? @relation(fields: [organizationId], references: [id])
   issues        Issue[]
   checks        CheckLog[]
   createdAt     DateTime @default(now())
@@ -73,17 +75,36 @@ model Standard {
   id          String   @id @default(cuid())
   code        String   @unique // "ГОСТ 2.104-2006"
   name        String   // "Основные надписи"
-  type        String   // "GOST" | "OST" | "STO" | "RD" | "REGISTER" | "ESKD" | "SPDS"
+  type        String   // "GOST" | "OST" | "STO" | "RD" | "REGISTER" | "ESKD" | "ESTD" | "ESPD" | "SPDS"
   scope       String   // область применения (короткое описание)
   description String?  // полное описание / ключевые требования
   status      String   @default("active") // active | cancelled | draft
   publishedAt String?  // год/дата
+  category    String?  // категория для группировки (eskd | estd | materials | welding | tolerances | shipbuilding | register | rd | sto | spds)
+  source      String   @default("manual") // manual | cntd | rs-class | rr-reg | imported
+  sourceUrl   String?  // URL оригинала (docs.cntd.ru/...)
+  clauses     StandardClause[]
+  rules       Rule[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  rules       Rule[]
 
   @@index([type])
   @@index([status])
+  @@index([category])
+}
+
+// Ключевые пункты стандарта (для RAG/LLM-проверок)
+model StandardClause {
+  id          String   @id @default(cuid())
+  standardId  String
+  number      String   // "3.1", "4.2.1"
+  title       String   // название пункта
+  text        String   // текст требования
+  severity    String   @default("medium") // важность пункта
+  createdAt   DateTime @default(now())
+  standard    Standard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+
+  @@index([standardId])
 }
 
 // Правило нормоконтроля
@@ -147,3 +168,108 @@ model CheckLog {
 
   @@index([documentId])
 }
+
+// ============ MONETIZATION MODELS ============
+
+// Организация (тенант) — для multi-tenant SaaS
+model Organization {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique // для URL / идентификации
+  inn           String?  // ИНН для юр.лиц
+  contactEmail  String?
+  contactPhone  String?
+  plan          String   @default("free") // free | pro | enterprise
+  maxDocuments  Int      @default(50) // лимит документов в месяц
+  maxChecks     Int      @default(100) // лимит проверок в месяц
+  maxUsers      Int      @default(3)
+  status        String   @default("active") // active | suspended | cancelled
+  trialEndsAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  users         User[]
+  apiKeys       ApiKey[]
+  auditLogs     AuditLog[]
+  documents     Document[]
+}
+
+// Пользователь системы
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String?
+  passwordHash    String?
+  role            String   @default("engineer") // admin | normocontroller | engineer | viewer
+  organizationId  String?
+  status          String   @default("active") // active | disabled | pending
+  lastLoginAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  auditLogs       AuditLog[]
+
+  @@index([organizationId])
+  @@index([role])
+}
+
+// API-ключ для программного доступа (монетизация API)
+model ApiKey {
+  id              String   @id @default(cuid())
+  organizationId  String
+  name            String   // человеко-читаемое имя ключа
+  keyPrefix       String   // первые 8 символов для отображения
+  keyHash         String   @unique // хэш полного ключа
+  scopes          String   @default("read") // read | write | admin (через запятую)
+  requestsCount   Int      @default(0)
+  requestsLimit   Int      @default(1000) // лимит запросов в месяц
+  periodStart     DateTime @default(now()) // начало расчётного периода
+  lastUsedAt      DateTime?
+  expiresAt       DateTime?
+  status          String   @default("active") // active | revoked | expired
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  organization    Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([status])
+}
+
+// Аудит-лог действий пользователей (для безопасности и compliance)
+model AuditLog {
+  id              String   @id @default(cuid())
+  organizationId  String?
+  userId          String?
+  action          String   // "document.upload" | "document.analyze" | "issue.confirm" | "rule.toggle" | "apikey.create" ...
+  resourceType    String?  // "document" | "issue" | "rule" | "standard" | "apikey"
+  resourceId      String?
+  details         String?  // JSON-строка с деталями
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  user            User?    @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// Подписка / биллинг (для будущей интеграции с платёжными системами)
+model Subscription {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  plan            String   @default("free") // free | pro | enterprise
+  status          String   @default("active") // active | past_due | cancelled | trialing
+  amount          Float    @default(0) // в рублях
+  currency        String   @default("RUB")
+  interval        String   @default("month") // month | year
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime?
+  cancelAt          DateTime?
+  paymentProvider   String?  // "yookassa" | "tinkoff" | "stripe" | "manual"
+  externalId        String?  // ID подписки в платёжной системе
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+

@@ -10,6 +10,9 @@ export type NKView =
   | 'rules'
   | 'projects'
   | 'document-detail'
+  | 'settings'
+  | 'apikeys'
+  | 'audit'
 
 interface NKStore {
   view: NKView

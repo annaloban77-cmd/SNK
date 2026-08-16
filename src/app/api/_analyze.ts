@@ -1,5 +1,6 @@
 // Shared analyze pipeline — used by /api/documents/[id]/analyze and /api/samples/[id]/analyze
 import { db } from '@/lib/db'
+import { logAudit } from '@/lib/audit'
 import { mapIssue, parseStamp } from './_map'
 import { extractStampFromImage, llmSemanticCheck, type ExtractedStamp } from '@/lib/zai'
 import { runDeterministicRules, toStampFields, fromLlmIssues, type RuleCheckResult } from '@/lib/rules'
@@ -31,7 +32,7 @@ export async function fileToImageDataUrl(filePath: string, mimeType: string): Pr
   if (mimeType.toLowerCase() === 'application/pdf') {
     try {
       const pdfBuf = await readFile(filePath)
-      const pngBuf = await sharp(pdfBuf, { pages: [1], density: 200 }).resize(1600).png().toBuffer()
+      const pngBuf = await sharp(pdfBuf, { page: 1, density: 200 }).resize(1600).png().toBuffer()
       return `data:image/png;base64,${pngBuf.toString('base64')}`
     } catch (e) {
       console.error('PDF rasterize failed:', e)
@@ -234,6 +235,24 @@ export async function runAnalyzePipeline(
     await logStage(documentId, 'report', 'success', totalDur, `Всего: ${issueCount} замечаний (high=${highCount}, med=${mediumCount}, low=${lowCount})`)
     stages.push({ stage: 'report', status: 'success', durationMs: totalDur, message: `${issueCount} замечаний` })
 
+    // Audit log — analyze action
+    await logAudit({
+      organizationId: doc.organizationId ?? null,
+      action: 'document.analyze',
+      resourceType: 'document',
+      resourceId: documentId,
+      details: {
+        runLlm,
+        status: 'analyzed',
+        issueCount,
+        highCount,
+        mediumCount,
+        lowCount,
+        durationMs: totalDur,
+        stages: stages.map((s) => ({ stage: s.stage, status: s.status, durationMs: s.durationMs })),
+      },
+    })
+
     const freshIssues = await db.issue.findMany({
       where: { documentId },
       orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
@@ -266,6 +285,14 @@ export async function runAnalyzePipeline(
     await db.document.update({ where: { id: documentId }, data: { status: 'failed', checkDuration: totalDur } })
     await logStage(documentId, 'report', 'failed', totalDur, msg)
     stages.push({ stage: 'report', status: 'failed', durationMs: totalDur, message: msg })
+    // Audit log — analyze failure
+    await logAudit({
+      organizationId: doc.organizationId ?? null,
+      action: 'document.analyze',
+      resourceType: 'document',
+      resourceId: documentId,
+      details: { runLlm, status: 'failed', error: msg, durationMs: totalDur },
+    })
     return {
       error: msg,
       documentId,

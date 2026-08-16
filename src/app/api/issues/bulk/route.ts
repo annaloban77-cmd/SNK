@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { logAudit } from '@/lib/audit'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,9 +26,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Недопустимое действие: ${action}. Допустимо: confirm, reject, fix` }, { status: 400 })
   }
 
+  // Pre-fetch issues for audit logging
+  const existing = await db.issue.findMany({
+    where: { id: { in: body.ids } },
+    select: { id: true, code: true, documentId: true, document: { select: { organizationId: true } } },
+  })
+
   const result = await db.issue.updateMany({
     where: { id: { in: body.ids } },
     data: { status },
+  })
+
+  // Audit log — single entry summarizing the bulk action
+  const orgId = existing.find((i) => i.document?.organizationId)?.document?.organizationId ?? null
+  await logAudit({
+    organizationId: orgId,
+    action: 'issue.bulk_update',
+    resourceType: 'issue',
+    details: {
+      action,
+      newStatus: status,
+      ids: body.ids,
+      affectedCount: result.count,
+      codes: existing.map((i) => i.code),
+    },
   })
 
   return NextResponse.json({ updated: result.count })

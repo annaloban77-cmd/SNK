@@ -41,6 +41,9 @@ export async function GET() {
     recentDocsRaw,
     analyzedDocs,
     passedCount,
+    standardsCount,
+    rulesCount,
+    categoriesCount,
   ] = await Promise.all([
     db.document.count(),
     db.document.count({ where: { status: 'analyzed' } }),
@@ -64,6 +67,9 @@ export async function GET() {
       select: { checkDuration: true },
     }),
     db.document.count({ where: { status: 'analyzed', highCount: 0 } }),
+    db.standard.count(),
+    db.rule.count({ where: { enabled: true } }),
+    db.standard.findMany({ where: { NOT: { category: null } }, select: { category: true }, distinct: ['category'] }),
   ])
 
   const sumDur = analyzedDocs.reduce((acc, d) => acc + (d.checkDuration ?? 0), 0)
@@ -170,6 +176,10 @@ export async function GET() {
     checksLast14Days: days,
     recentDocuments,
     topIssues,
+    // Extension (Task 3-a) — expose knowledge base size
+    standardsCount,
+    rulesCount,
+    categoriesCount: categoriesCount.length,
   }
 
   return NextResponse.json(stats)

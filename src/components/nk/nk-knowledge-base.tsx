@@ -20,19 +20,38 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { BookOpen, RefreshCw, ShieldCheck, ListChecks } from 'lucide-react'
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from '@/components/ui/collapsible'
+import {
+  BookOpen,
+  RefreshCw,
+  ShieldCheck,
+  ListChecks,
+  ExternalLink,
+  ChevronDown,
+  FileText,
+  Globe,
+  Database,
+  Library,
+} from 'lucide-react'
 import {
   useStandards,
   useStandard,
+  useStandardsStats,
+  useStandardClauses,
   type StandardFilters,
 } from '@/hooks/use-nk-api'
 import { PageHeader } from './nk-page-header'
 import { EmptyState, ErrorState } from './nk-empty-state'
+import { CategoryFilter } from './nk-category-filter'
 import {
   formatDate,
   standardTypeLabel,
 } from './nk-format'
-import type { RuleDto, StandardDto } from '@/lib/types'
+import type { RuleDto, StandardDto, StandardClauseDto } from '@/lib/types'
 
 const TYPE_OPTIONS = [
   { value: 'all', label: 'Все типы' },
@@ -45,6 +64,14 @@ const TYPE_OPTIONS = [
   { value: 'SPDS', label: 'СПДС' },
 ]
 
+const SOURCE_OPTIONS = [
+  { value: 'all', label: 'Все источники' },
+  { value: 'manual', label: 'Ручной ввод' },
+  { value: 'cntd', label: 'ЦНТД' },
+  { value: 'rs-class', label: 'RS-Class' },
+  { value: 'rr-reg', label: 'Регистр РФ' },
+]
+
 const STATUS_BADGE_STYLE: Record<string, string> = {
   active:
     'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-900',
@@ -54,9 +81,42 @@ const STATUS_BADGE_STYLE: Record<string, string> = {
     'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700',
 }
 
+const SOURCE_BADGE: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
+  manual: {
+    label: 'Ручной',
+    icon: <FileText className="size-3" />,
+    cls: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-300 dark:border-slate-700',
+  },
+  cntd: {
+    label: 'ЦНТД',
+    icon: <Database className="size-3" />,
+    cls: 'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-950/60 dark:text-sky-200 dark:border-sky-900',
+  },
+  'rs-class': {
+    label: 'RS-Class',
+    icon: <Globe className="size-3" />,
+    cls: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-950/60 dark:text-violet-200 dark:border-violet-900',
+  },
+  'rr-reg': {
+    label: 'Регистр РФ',
+    icon: <ShieldCheck className="size-3" />,
+    cls: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/60 dark:text-red-200 dark:border-red-900',
+  },
+}
+
+function sourceBadge(source: string) {
+  return SOURCE_BADGE[source] ?? {
+    label: source,
+    icon: <Globe className="size-3" />,
+    cls: 'bg-slate-100 text-slate-700 border-slate-200',
+  }
+}
+
 export function KnowledgeBase() {
   const [filters, setFilters] = React.useState<StandardFilters>({
     type: 'all',
+    category: 'all',
+    source: 'all',
     search: '',
     page: 1,
     pageSize: 60,
@@ -70,8 +130,20 @@ export function KnowledgeBase() {
   }, [searchBox])
 
   const { data, isLoading, isError, refetch, isFetching } = useStandards(filters)
+  const statsQ = useStandardsStats()
 
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
+
+  const categoryOptions = React.useMemo(() => {
+    return (statsQ.data?.byCategory ?? [])
+      .filter((c) => c.category && c.category !== 'unknown')
+      .map((c) => ({
+        category: c.category,
+        label: c.label,
+        count: c.count,
+        color: c.color,
+      }))
+  }, [statsQ.data])
 
   return (
     <div className="space-y-5">
@@ -88,12 +160,52 @@ export function KnowledgeBase() {
         }
       />
 
+      {/* Stats bar */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MiniStat
+          label="Всего стандартов"
+          value={statsQ.data?.total ?? 0}
+          loading={statsQ.isLoading}
+          icon={<BookOpen className="size-4" />}
+          tone="slate"
+        />
+        <MiniStat
+          label="Действующих"
+          value={statsQ.data?.activeCount ?? 0}
+          loading={statsQ.isLoading}
+          icon={<ShieldCheck className="size-4" />}
+          tone="emerald"
+        />
+        <MiniStat
+          label="С пунктами"
+          value={statsQ.data?.withClausesCount ?? 0}
+          loading={statsQ.isLoading}
+          icon={<ListChecks className="size-4" />}
+          tone="amber"
+        />
+        <MiniStat
+          label="Категорий"
+          value={(statsQ.data?.byCategory ?? []).filter((c) => c.category && c.category !== 'unknown').length}
+          loading={statsQ.isLoading}
+          icon={<Library className="size-4" />}
+          tone="sky"
+        />
+      </div>
+
       <Card>
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2">
+        <CardContent className="space-y-3 p-4">
+          {/* Category filter — button group */}
+          <CategoryFilter
+            options={categoryOptions}
+            value={filters.category ?? 'all'}
+            onChange={(c) =>
+              setFilters((f) => ({ ...f, category: c, page: 1 }))
+            }
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">
-                Тип стандарта
+                Тип
               </label>
               <Select
                 value={filters.type ?? 'all'}
@@ -115,17 +227,50 @@ export function KnowledgeBase() {
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">
+                Источник
+              </label>
+              <Select
+                value={filters.source ?? 'all'}
+                onValueChange={(v) =>
+                  setFilters((f) => ({ ...f, source: v, page: 1 }))
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SOURCE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">
                 Поиск
               </label>
               <Input
-                placeholder="Код, наименование, область…"
+                placeholder="Код, наименование…"
                 value={searchBox}
                 onChange={(e) => setSearchBox(e.target.value)}
               />
             </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            Всего: {data?.total ?? 0}
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Найдено: {data?.total ?? 0}</span>
+            {filters.category && filters.category !== 'all' ? (
+              <button
+                type="button"
+                className="text-emerald-700 hover:underline dark:text-emerald-400"
+                onClick={() =>
+                  setFilters((f) => ({ ...f, category: 'all', page: 1 }))
+                }
+              >
+                Сбросить категорию
+              </button>
+            ) : null}
           </div>
         </CardContent>
       </Card>
@@ -138,7 +283,7 @@ export function KnowledgeBase() {
       ) : isLoading ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full" />
+            <Skeleton key={i} className="h-44 w-full" />
           ))}
         </div>
       ) : (data?.items ?? []).length === 0 ? (
@@ -167,6 +312,44 @@ export function KnowledgeBase() {
   )
 }
 
+function MiniStat({
+  label,
+  value,
+  loading,
+  icon,
+  tone,
+}: {
+  label: string
+  value: number
+  loading?: boolean
+  icon: React.ReactNode
+  tone: 'slate' | 'emerald' | 'amber' | 'sky'
+}) {
+  const cls: Record<typeof tone, string> = {
+    slate: 'text-slate-700 dark:text-slate-300',
+    emerald: 'text-emerald-700 dark:text-emerald-400',
+    amber: 'text-amber-700 dark:text-amber-400',
+    sky: 'text-sky-700 dark:text-sky-400',
+  } as const
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={`${cls[tone]}`}>{icon}</div>
+        <div className="min-w-0">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            {label}
+          </div>
+          {loading ? (
+            <Skeleton className="mt-1 h-5 w-12" />
+          ) : (
+            <div className="text-xl font-bold tabular-nums">{value}</div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function StandardCard({
   standard,
   onOpen,
@@ -174,6 +357,7 @@ function StandardCard({
   standard: StandardDto
   onOpen: () => void
 }) {
+  const sb = sourceBadge(standard.source)
   return (
     <Card
       className="cursor-pointer transition-shadow hover:shadow-md"
@@ -191,10 +375,10 @@ function StandardCard({
           {standard.scope}
         </CardDescription>
       </CardHeader>
-      <CardFooter className="mt-auto flex items-center justify-between pt-0 text-xs text-muted-foreground">
-        <span>
+      <CardFooter className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-0 text-xs text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
           <span
-            className={`mr-1 inline-flex items-center rounded-md border px-1.5 py-0.5 ${
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${
               STATUS_BADGE_STYLE[standard.status] ?? ''
             }`}
           >
@@ -206,10 +390,21 @@ function StandardCard({
           </span>
           {standard.publishedAt ? formatDate(standard.publishedAt) : '—'}
         </span>
-        <span className="inline-flex items-center gap-1">
-          <ListChecks className="size-3" />
-          правил: {standard.rulesCount}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {standard.clausesCount > 0 ? (
+            <span className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              <ListChecks className="size-3" />
+              {standard.clausesCount} п.
+            </span>
+          ) : null}
+          <span
+            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 ${sb.cls}`}
+            title={`Источник: ${sb.label}`}
+          >
+            {sb.icon}
+            {sb.label}
+          </span>
+        </div>
       </CardFooter>
     </Card>
   )
@@ -223,11 +418,22 @@ function StandardDetailDialog({
   onOpenChange: (v: boolean) => void
 }) {
   const { data, isLoading } = useStandard(id)
+  const clausesQ = useStandardClauses(id)
+  const [clausesOpen, setClausesOpen] = React.useState(true)
+
+  React.useEffect(() => {
+    if (!id) setClausesOpen(true)
+  }, [id])
+
+  const hasClauses =
+    (data?.clausesCount ?? 0) > 0 || (clausesQ.data?.items?.length ?? 0) > 0
+  const sb = data ? sourceBadge(data.source) : null
+
   return (
     <Dialog open={!!id} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[640px]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex flex-wrap items-center gap-2">
             <ShieldCheck className="size-5 text-muted-foreground" />
             {isLoading ? (
               <Skeleton className="h-6 w-32" />
@@ -238,6 +444,14 @@ function StandardDetailDialog({
               <Badge variant="outline" className="text-xs">
                 {standardTypeLabel(data.type)}
               </Badge>
+            ) : null}
+            {data && sb ? (
+              <span
+                className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] ${sb.cls}`}
+              >
+                {sb.icon}
+                {sb.label}
+              </span>
             ) : null}
           </DialogTitle>
           <DialogDescription>{data?.name}</DialogDescription>
@@ -277,6 +491,76 @@ function StandardDetailDialog({
               <div className="mt-0.5">{formatDate(data?.publishedAt)}</div>
             </div>
           </div>
+
+          {data?.sourceUrl ? (
+            <div>
+              <Button asChild variant="outline" size="sm">
+                <a href={data.sourceUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="size-4" /> Открыть оригинал
+                </a>
+              </Button>
+            </div>
+          ) : null}
+
+          {/* Key clauses (collapsible) */}
+          {hasClauses ? (
+            <Collapsible open={clausesOpen} onOpenChange={setClausesOpen}>
+              <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-sm font-medium hover:bg-muted/50">
+                <span className="flex items-center gap-2">
+                  <ListChecks className="size-4 text-amber-600" />
+                  Ключевые пункты ({clausesQ.data?.items?.length ?? data?.clausesCount ?? 0})
+                </span>
+                <ChevronDown
+                  className={`size-4 transition-transform ${
+                    clausesOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-2 pt-2">
+                {clausesQ.isLoading ? (
+                  <Skeleton className="h-20 w-full" />
+                ) : (clausesQ.data?.items ?? []).length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    Список пунктов пуст
+                  </div>
+                ) : (
+                  (clausesQ.data?.items ?? []).map((c: StandardClauseDto) => (
+                    <div
+                      key={c.id}
+                      className="rounded-md border p-3 text-sm"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-mono text-xs font-semibold">
+                          {c.number}
+                          {c.title ? ` · ${c.title}` : ''}
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${
+                            c.severity === 'high'
+                              ? 'border-red-200 text-red-700 dark:border-red-900 dark:text-red-300'
+                              : c.severity === 'medium'
+                              ? 'border-amber-200 text-amber-700 dark:border-amber-900 dark:text-amber-300'
+                              : 'border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {c.severity === 'high'
+                            ? 'Высокая'
+                            : c.severity === 'medium'
+                            ? 'Средняя'
+                            : 'Низкая'}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {c.text}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          ) : null}
+
           <div>
             <div className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Связанные правила ({data?.rules?.length ?? 0})

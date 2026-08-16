@@ -15,7 +15,7 @@ export async function GET(
       rules: {
         orderBy: { code: 'asc' },
       },
-      _count: { select: { rules: true } },
+      _count: { select: { rules: true, clauses: true } },
     },
   })
   if (!std) {

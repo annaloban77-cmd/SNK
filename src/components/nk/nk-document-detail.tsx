@@ -13,6 +13,7 @@ import {
   useDocumentIssues,
   useCheckLog,
   useAnalyzeDocument,
+  downloadReport,
   type CheckLogEntry,
 } from '@/hooks/use-nk-api'
 import { useNKStore } from '@/stores/nk-store'
@@ -111,7 +112,12 @@ export function DocumentDetail() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => toastDownload()}
+              onClick={() => {
+                toast.info('Подготовка отчёта…', {
+                  description: 'Отчёт откроется в новой вкладке',
+                })
+                downloadReport(docId)
+              }}
             >
               <Download className="size-4" /> Скачать отчёт
             </Button>
@@ -174,10 +180,6 @@ export function DocumentDetail() {
       <DocumentTabs docId={docId} />
     </div>
   )
-}
-
-function toastDownload() {
-  toast.info('В разработке')
 }
 
 function DocumentPreview({

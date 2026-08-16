@@ -12,10 +12,19 @@ import type {
   IssueDto,
   RuleDto,
   StandardDto,
+  StandardClauseDto,
   DashboardStats,
   AnalyzeResponse,
   Severity,
   IssueStatus,
+  OrganizationDto,
+  UserDto,
+  ApiKeyDto,
+  ApiKeyWithSecret,
+  AuditLogDto,
+  SubscriptionDto,
+  UsageStats,
+  StandardsStats,
 } from '@/lib/types'
 
 // ---------- Types for filter payloads ----------
@@ -41,7 +50,16 @@ export interface IssueFilters {
 
 export interface StandardFilters {
   type?: string
+  category?: string
+  source?: string
   search?: string
+  page?: number
+  pageSize?: number
+}
+
+export interface AuditFilters {
+  action?: string
+  userId?: string
   page?: number
   pageSize?: number
 }
@@ -83,6 +101,20 @@ export interface ProjectItem {
   documentsCount: number
   createdAt: string
   updatedAt: string
+}
+
+export interface PlanItem {
+  id: string
+  name: string
+  price: number
+  currency: string
+  interval: string
+  maxDocuments: number
+  maxChecks: number
+  maxUsers: number
+  maxApiRequests?: number
+  highlighted?: boolean
+  features: string[]
 }
 
 // ---------- Low-level fetch helpers ----------
@@ -268,6 +300,107 @@ export function useSamples() {
   })
 }
 
+export function useStandardsStats() {
+  return useQuery<StandardsStats>({
+    queryKey: ['standards-stats'],
+    queryFn: () => apiFetch<StandardsStats>('/api/standards/stats'),
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+export function useStandardClauses(id: string | null) {
+  return useQuery<{ items: StandardClauseDto[] }>({
+    queryKey: ['standard-clauses', id],
+    queryFn: () =>
+      apiFetch<{ items: StandardClauseDto[] }>(
+        `/api/standards/${id}/clauses`
+      ),
+    enabled: !!id,
+  })
+}
+
+// ---------- Organization & Monetization Queries ----------
+
+export function useOrganization() {
+  return useQuery<OrganizationDto>({
+    queryKey: ['organization'],
+    queryFn: () => apiFetch<OrganizationDto>('/api/organization'),
+    staleTime: 60 * 1000,
+  })
+}
+
+export function useOrgUsers() {
+  return useQuery<{ items: UserDto[] }>({
+    queryKey: ['org-users'],
+    queryFn: () => apiFetch<{ items: UserDto[] }>('/api/organization/users'),
+  })
+}
+
+export function useApiKeys() {
+  return useQuery<{ items: ApiKeyDto[] }>({
+    queryKey: ['api-keys'],
+    queryFn: () =>
+      apiFetch<{ items: ApiKeyDto[] }>('/api/organization/api-keys'),
+  })
+}
+
+export function useAuditLog(filters: AuditFilters = {}) {
+  return useQuery<{
+    items: AuditLogDto[]
+    total: number
+    page: number
+    pageSize: number
+  }>({
+    queryKey: ['audit', filters],
+    queryFn: () =>
+      apiFetch<{
+        items: AuditLogDto[]
+        total: number
+        page: number
+        pageSize: number
+      }>(
+        `/api/organization/audit${buildQS(filters as Record<string, unknown>)}`
+      ),
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000,
+  })
+}
+
+export function useUsageStats() {
+  return useQuery<UsageStats>({
+    queryKey: ['usage'],
+    queryFn: () => apiFetch<UsageStats>('/api/organization/usage'),
+    staleTime: 30 * 1000,
+  })
+}
+
+export function useSubscription() {
+  return useQuery<SubscriptionDto>({
+    queryKey: ['subscription'],
+    queryFn: () =>
+      apiFetch<SubscriptionDto>('/api/organization/subscription'),
+  })
+}
+
+export function usePlans() {
+  return useQuery<{ items: PlanItem[] } | PlanItem[]>({
+    queryKey: ['plans'],
+    queryFn: async () => {
+      const data = await apiFetch<unknown>('/api/organization/plans')
+      // Endpoint may return either an array or { items: [] }
+      if (Array.isArray(data)) return data as PlanItem[]
+      return data as { items: PlanItem[] }
+    },
+    staleTime: 30 * 60 * 1000,
+  })
+}
+
+/** Trigger HTML report download for a document. Not a hook. */
+export function downloadReport(documentId: string) {
+  if (typeof window === 'undefined') return
+  window.open(`/api/reports/${documentId}/html`, '_blank')
+}
+
 // ---------- Mutations ----------
 
 export function useUploadDocument() {
@@ -414,6 +547,143 @@ export function useAnalyzeSample() {
       }
     },
     onError: (e: Error) => toast.error('Ошибка анализа: ' + e.message),
+  })
+}
+
+// ---------- Organization & Monetization Mutations ----------
+
+export function useUpdateOrganization() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      name?: string
+      contactEmail?: string
+      contactPhone?: string
+    }) => {
+      return apiFetch<OrganizationDto>('/api/organization', {
+        method: 'PATCH',
+        body: JSON.stringify(vars),
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['organization'] })
+      qc.invalidateQueries({ queryKey: ['usage'] })
+      toast.success('Организация обновлена')
+    },
+    onError: (e: Error) => toast.error('Ошибка сохранения: ' + e.message),
+  })
+}
+
+export function useInviteUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      email: string
+      name: string
+      role: 'admin' | 'normocontroller' | 'engineer' | 'viewer'
+    }) => {
+      return apiFetch<UserDto>('/api/organization/users', {
+        method: 'POST',
+        body: JSON.stringify(vars),
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['org-users'] })
+      qc.invalidateQueries({ queryKey: ['organization'] })
+      qc.invalidateQueries({ queryKey: ['usage'] })
+      toast.success('Пользователь приглашён')
+    },
+    onError: (e: Error) => toast.error('Ошибка приглашения: ' + e.message),
+  })
+}
+
+export function useUpdateUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      id: string
+      role?: 'admin' | 'normocontroller' | 'engineer' | 'viewer'
+      status?: 'active' | 'disabled' | 'pending'
+    }) => {
+      return apiFetch<UserDto>(`/api/organization/users/${vars.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          role: vars.role,
+          status: vars.status,
+        }),
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['org-users'] })
+      toast.success('Пользователь обновлён')
+    },
+    onError: (e: Error) => toast.error('Ошибка: ' + e.message),
+  })
+}
+
+export function useCreateApiKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      name: string
+      scopes: string
+    }) => {
+      return apiFetch<ApiKeyWithSecret>('/api/organization/api-keys', {
+        method: 'POST',
+        body: JSON.stringify(vars),
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['api-keys'] })
+      qc.invalidateQueries({ queryKey: ['organization'] })
+      qc.invalidateQueries({ queryKey: ['usage'] })
+    },
+    onError: (e: Error) => toast.error('Ошибка создания ключа: ' + e.message),
+  })
+}
+
+export function useUpdateApiKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: {
+      id: string
+      status: 'active' | 'revoked' | 'expired'
+    }) => {
+      return apiFetch<ApiKeyDto>(`/api/organization/api-keys/${vars.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: vars.status }),
+      })
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['api-keys'] })
+      qc.invalidateQueries({ queryKey: ['audit'] })
+      toast.success(
+        vars.status === 'revoked'
+          ? 'API-ключ отозван'
+          : 'Статус ключа обновлён'
+      )
+    },
+    onError: (e: Error) => toast.error('Ошибка: ' + e.message),
+  })
+}
+
+export function useDeleteApiKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { id: string }) => {
+      return apiFetch<{ success: boolean }>(
+        `/api/organization/api-keys/${vars.id}`,
+        { method: 'DELETE' }
+      )
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['api-keys'] })
+      qc.invalidateQueries({ queryKey: ['organization'] })
+      qc.invalidateQueries({ queryKey: ['usage'] })
+      qc.invalidateQueries({ queryKey: ['audit'] })
+      toast.success('API-ключ удалён')
+    },
+    onError: (e: Error) => toast.error('Ошибка удаления: ' + e.message),
   })
 }
 

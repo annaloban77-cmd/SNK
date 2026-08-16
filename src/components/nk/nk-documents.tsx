@@ -109,7 +109,7 @@ export function Documents() {
   // Apply project filter override from Projects view
   React.useEffect(() => {
     if (store.documentsProjectId) {
-      setFilters((f) => ({ ...f, projectId: store.documentsProjectId, page: 1 }))
+      setFilters((f) => ({ ...f, projectId: store.documentsProjectId ?? undefined, page: 1 }))
     }
   }, [store.documentsProjectId])
 

@@ -440,3 +440,91 @@ Stage Summary:
 7. **Не реализовано** (MVP-ограничение): удаление документов, ручное указание формата при загрузке (только auto-detect), пакетная печать отчётов, экспорт в Excel/PDF. Всё это можно добавить без переделки архитектуры.
 8. **`bun run lint`** ругался на `eslint-disable-next-line @next/next/no-img-element` (правило отключено в eslint.config.mjs) — убрал неиспользуемую директиву, теперь 0 warnings.
 9. **Не трогал**: `src/app/api/**`, `src/lib/**`, `src/components/ui/**`, `prisma/**`, `scripts/**`, `package.json` — только свои файлы в `src/app/{page,layout}.tsx`, `src/components/nk/**`, `src/hooks/use-nk-api.ts`, `src/stores/nk-store.ts`.
+
+---
+
+Task ID: 3-b
+Agent: full-stack-developer (frontend)
+Task: Frontend monetization — Settings / API Keys / Audit Log views + KB improvements + Dashboard KB stats card + report export + org badge in header
+
+Work Log — созданные/изменённые файлы:
+
+**State & hooks:**
+1. `src/stores/nk-store.ts` — расширил `NKView` тремя новыми разделами: `'settings' | 'apikeys' | 'audit'`. Полный список: dashboard/documents/issues/knowledge/rules/projects/document-detail/settings/apikeys/audit.
+2. `src/hooks/use-nk-api.ts` — добавил 15+ новых хуков для monetization:
+   - Queries: `useStandardsStats`, `useStandardClauses(id)`, `useOrganization`, `useOrgUsers`, `useApiKeys`, `useAuditLog(filters)` (с `refetchInterval: 30_000`), `useUsageStats`, `useSubscription`, `usePlans` (handles both array & { items:[] } response).
+   - Mutations: `useUpdateOrganization` (PATCH), `useInviteUser` (POST), `useUpdateUser` (PATCH role/status), `useCreateApiKey` (POST, returns `ApiKeyWithSecret`), `useUpdateApiKey` (PATCH status), `useDeleteApiKey` (DELETE).
+   - Helper: `downloadReport(documentId)` — `window.open('/api/reports/{id}/html', '_blank')`.
+   - Расширил `StandardFilters` полями `category` и `source`.
+   - Добавил тип `AuditFilters` и `PlanItem`.
+
+**Shared components (новые):**
+3. `src/components/nk/nk-usage-bar.tsx` — `<UsageBar label value max percent?>` — прогресс-бар с авторасчётом тона: green (<60%), amber (60-90%), red (>90%), slate (0). Используется в Settings (использование) и API Keys (requestsCount/requestsLimit).
+4. `src/components/nk/nk-plan-card.tsx` — `<PlanCard plan current? onSelect?>` — карточка тарифа: имя, цена (с валютой и интервалом), 4 лимита в сетке, список features с зелёными галочками, подсветка популярного/текущего плана (emerald ring), CTA-кнопка. Используется в Settings (3 плана + сравнение в диалоге).
+5. `src/components/nk/nk-category-filter.tsx` — `<CategoryFilter options value onChange>` — кнопочная группа категорий с цветными точками и счётчиками. Используется в Knowledge Base для фильтра по 11 категориям стандартов.
+
+**Updated views:**
+6. `src/components/nk/nk-knowledge-base.tsx` — улучшения:
+   - **Stats bar** сверху: 4 mini-stat карточки (Всего стандартов / Действующих / С пунктами / Категорий) из `useStandardsStats()`.
+   - **Category filter** — кнопочная группа из `useStandardsStats().byCategory` с цветными точками и счётчиками (11 категорий: ЕСКД/ЕСТД/ЕСПД/СПДС/Сварка/Материалы/Допуски/Судостроение/Регистр/РД/СТО).
+   - **Source filter** — Select (manual/cntd/rs-class/rr-reg).
+   - **Source badge** на каждой карточке стандарта (иконка + подпись, тонированный).
+   - **clausesCount** badge (если >0) — «N п.» в amber.
+   - В detail-диалоге: **collapsible-секция "Ключевые пункты"** с пунктами из `useStandardClauses(id)` — номер, заголовок, текст, severity-badge.
+   - Кнопка **«Открыть оригинал»** (link на `sourceUrl`, открывается в новой вкладке) если есть.
+7. `src/components/nk/nk-dashboard.tsx` — добавил карточку **«База знаний»** под 4 KPI: иконка Library в emerald-квадрате, кнопка «Открыть» → Knowledge view, 4 mini-stat: Стандартов (420) / Правил (65) / Категорий (11) / Действующих (420). Данные берёт из extended `useDashboard()` (standardsCount/rulesCount/categoriesCount) с fallback на `useStandardsStats()`.
+8. `src/components/nk/nk-document-detail.tsx` — заменил заглушку `toastDownload()` (тост «В разработке») на реальный экспорт: кнопка «Скачать отчёт» теперь вызывает `downloadReport(docId)` (`window.open('/api/reports/{id}/html', '_blank')`) с предварительным тостом «Подготовка отчёта…».
+
+**New views:**
+9. `src/components/nk/nk-settings.tsx` — `<Settings>` с 5 секциями:
+   - **Организация** — карточка с формой: name (редактируемое), slug/inn (readonly disabled), contactEmail, contactPhone. Кнопка «Сохранить» → `useUpdateOrganization()`, dirty-state detection.
+   - **Подписка** — карточка с текущим тарифом (имя + badge), суммой (₽/мес), статусом, периодом (начало/конец), платёжной системой. Кнопки «Сравнить тарифы» (dialog с 3 PlanCard) и «Изменить тариф» (тост «Свяжитесь с отделом продаж»).
+   - **Использование** — 4 UsageBar (documents/checks/users/api-requests) с авторасчётом тона; trial-days-left warning.
+   - **Пользователи** — таблица в ScrollArea (max-h-28rem): email+name, role-badge, status-badge, lastLoginAt, dropdown с role-change (4 роли) и status toggle (active/disabled). Кнопка «Пригласить» → диалог с email/name/role.
+   - **Тарифные планы** — 3 PlanCard (free/pro/enterprise), текущий тариф подсвечен emerald-ring.
+10. `src/components/nk/nk-api-keys.tsx` — `<ApiKeys>`:
+    - Header с кнопками Refresh + «Создать API-ключ».
+    - **Alert** с предупреждением о безопасности (ключ показывается только один раз).
+    - Таблица в ScrollArea: name + masked keyPrefix («nk-pro-k••••••••»), scopes (badges read/write/admin), UsageBar (requestsCount/requestsLimit), lastUsedAt, expiresAt, status badge, dropdown (Revoke/Delete).
+    - **Create dialog**: name input + scopes checkboxes (3 варианта). На success — открывается **SecretRevealDialog** (AlertDialog): показывает полный secret в моноширинном блоке, кнопка Copy (clipboard API), warning «Сохраните ключ, он больше не будет показан», кнопка «Я сохранил ключ».
+    - **Revoke** confirm dialog (amber action) → PATCH status=revoked.
+    - **Delete** confirm dialog (red action) → DELETE.
+    - **API documentation** card — 3 примера curl (список стандартов / анализ документа / получение документа), кнопка «Копировать» для каждого.
+11. `src/components/nk/nk-audit-log.tsx` — `<AuditLog>`:
+    - Filters: action (Select с 8 категориями: organization/user/apikey/rule/standard/document/api), userId (Select из `useOrgUsers()` с опциями «Все»/«Система»/список пользователей).
+    - Бейдж «Авто-обновление 30с» (использует `refetchInterval: 30_000` в useAuditLog).
+    - Таблица в ScrollArea: timestamp (formatDateTime), user (email+name или «Система» с Cpu-иконкой), action (badge с цветом по типу: green=create/invite, blue=update/view, red=delete/revoke + иконка глагола), resource (type + truncated id), IP (с Globe-иконкой), details (expandable Collapsible с JSON).
+    - **Pagination**: «Назад/Вперёд» + «стр. X из Y» + «Показано N–M из K».
+
+**Main page:**
+12. `src/app/page.tsx` — обновлён layout:
+    - Добавил 3 новых nav-items после «Проекты»: **Настройки** (Settings icon), **API-ключи** (KeyRound icon), **Аудит** (History icon).
+    - В header добавил **organization badge** (между статусом и theme-toggle): кнопка с slug + plan-badge (Pro=emerald, Free=slate, Enterprise=violet) + Sparkles-иконка. Клик → `setView('settings')`. Hidden на mobile (`hidden sm:flex`).
+    - Footer: заменил hardcoded «25 стандартов · 23 правила» на реальные `dash.standardsCount ?? statsQ.data.total` и `dash.rulesCount`. Если данные ещё грузятся — показывает «…».
+    - В sidebar-footer добавил организацию: «Организация: {slug}».
+    - В view-switch добавил 3 новых case: settings → `<SettingsView/>`, apikeys → `<ApiKeys/>`, audit → `<AuditLog/>`.
+
+Stage Summary:
+
+**Что работает:**
+- ✅ `bun run lint` проходит без ошибок и предупреждений (exit 0).
+- ✅ TypeScript: в моих файлах (src/components/nk/nk-*, src/hooks/use-nk-api.ts, src/stores/nk-store.ts, src/app/page.tsx) 0 ошибок (есть pre-existing ошибки в чужих файлах: nk-documents.tsx, nk-rules.tsx, _analyze.ts, lib/rules.ts — не в моём scope).
+- ✅ Dev-сервер отвечает 200 на `/`, HTML содержит все 9 nav-items: Дашборд/Документы/Замечания/База знаний/Правила/Проекты/Настройки/API-ключи/Аудит.
+- ✅ Проверены curl'ом все новые endpoints: /api/organization, /api/organization/users, /api/organization/api-keys, /api/organization/audit, /api/organization/usage, /api/organization/subscription, /api/organization/plans, /api/standards/stats, /api/standards?category=welding, /api/standards?source=cntd, /api/reports/{id}/html (200 text/html).
+- ✅ TanStack Query: useAuditLog с `refetchInterval: 30_000` — auto-refresh каждые 30 секунд.
+- ✅ Все мутации показывают toast (success/error) и инвалидируют правильные query-ключи.
+- ✅ Copy-to-clipboard работает в API Keys (secret reveal + curl examples).
+- ✅ Report export: `window.open('/api/reports/{id}/html', '_blank')` — открывает HTML-отчёт в новой вкладке.
+- ✅ Responsive: таблицы в ScrollArea (max-h-40rem), mobile sidebar → Sheet, мобильные breakpoints sm:/md:/lg:.
+
+**Caveats / примечания:**
+1. **Pre-existing Turbopack cache corruption errors** в `dev.log` (`Failed to restore task data`, `No such file or directory .sst`) — не связаны с моими изменениями, это внутренний кэш Turbopack. Сервер всё равно отвечает 200 на `/` и API.
+2. **Plan change MVP**: кнопка «Изменить тариф» показывает тост «Свяжитесь с отделом продаж» — реальная интеграция с платёжной системой (YooKassa) вне scope этого task'а.
+3. **Audit auto-refresh**: `refetchInterval: 30_000` работает только когда вкладка активна (TanStack Query по умолчанию не обновляет в фоне) — это правильно, чтобы не нагружать сервер.
+4. **API Keys secret**: показывается один раз в `SecretRevealDialog`. После закрытия окна восстановить нельзя — это соответствует требованиям безопасности. В таблице отображается только `keyPrefix` (первые 8 символов + bullets).
+5. **Settings organization form**: slug и inn — readonly (disabled), только name/email/phone можно редактировать. Это соответствует контракту PATCH /api/organization.
+6. **Knowledge base category filter**: 12 категорий (11 + «Все»), кнопочная группа с wraps. Цвета берутся из `useStandardsStats().byCategory[].color` (sky/yellow/red/orange/violet/amber/cyan/lime/teal/pink/green/slate).
+7. **Footer counts**: использует `dash.standardsCount` (extended dashboard) с fallback на `statsQ.data.total` — если endpoint /api/dashboard ещё не вернул standardsCount, но /api/standards/stats уже загрузился, покажется statsQ значение.
+8. **Plan badge в header**: скрыт на mobile (`hidden sm:flex`) для экономии места — на мобильном organization badge не помещается рядом с другими кнопками. Slug показывается в sidebar footer.
+9. **Не трогал**: `src/app/api/**`, `src/lib/**`, `src/components/ui/**`, `prisma/**`, `scripts/**`, `package.json`, существующие файлы `nk-documents.tsx`, `nk-rules.tsx`, `nk-issues.tsx`, `nk-projects.tsx`, `nk-status-badge.tsx`, `nk-severity-badge.tsx`, `nk-source-icon.tsx`, `nk-stat-card.tsx`, `nk-page-header.tsx`, `nk-empty-state.tsx`, `nk-upload-dialog.tsx`, `nk-issue-card.tsx`, `nk-format.ts`, `nk-providers.tsx`.
+

@@ -25,10 +25,18 @@ import {
   FolderKanban,
   Upload,
   CircleDot,
+  Settings,
+  KeyRound,
+  History,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNKStore, type NKView } from '@/stores/nk-store'
-import { useDashboard } from '@/hooks/use-nk-api'
+import {
+  useDashboard,
+  useStandardsStats,
+  useOrganization,
+} from '@/hooks/use-nk-api'
 import { UploadDocumentDialog } from '@/components/nk/nk-upload-dialog'
 import { Dashboard } from '@/components/nk/nk-dashboard'
 import { Documents } from '@/components/nk/nk-documents'
@@ -37,12 +45,30 @@ import { Issues } from '@/components/nk/nk-issues'
 import { KnowledgeBase } from '@/components/nk/nk-knowledge-base'
 import { Rules } from '@/components/nk/nk-rules'
 import { Projects } from '@/components/nk/nk-projects'
+import { Settings as SettingsView } from '@/components/nk/nk-settings'
+import { ApiKeys } from '@/components/nk/nk-api-keys'
+import { AuditLog } from '@/components/nk/nk-audit-log'
 
 interface NavItem {
   id: NKView
   label: string
   icon: React.ReactNode
   badge?: React.ReactNode
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  free: 'Старт',
+  pro: 'Профи',
+  enterprise: 'Предприятие',
+}
+
+const PLAN_BADGE_CLS: Record<string, string> = {
+  free:
+    'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-slate-700',
+  pro:
+    'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-900',
+  enterprise:
+    'bg-violet-100 text-violet-800 border-violet-200 dark:bg-violet-950/60 dark:text-violet-200 dark:border-violet-900',
 }
 
 export default function Home() {
@@ -55,6 +81,8 @@ export default function Home() {
   const selectDocument = useNKStore((s) => s.selectDocument)
 
   const { data: dash } = useDashboard()
+  const statsQ = useStandardsStats()
+  const orgQ = useOrganization()
 
   const [uploadOpen, setUploadOpen] = React.useState(false)
 
@@ -91,6 +119,9 @@ export default function Home() {
     { id: 'knowledge', label: 'База знаний', icon: <BookOpen className="size-4" /> },
     { id: 'rules', label: 'Правила', icon: <ListChecks className="size-4" /> },
     { id: 'projects', label: 'Проекты', icon: <FolderKanban className="size-4" /> },
+    { id: 'settings', label: 'Настройки', icon: <Settings className="size-4" /> },
+    { id: 'apikeys', label: 'API-ключи', icon: <KeyRound className="size-4" /> },
+    { id: 'audit', label: 'Аудит', icon: <History className="size-4" /> },
   ]
 
   function handleNav(v: NKView) {
@@ -115,6 +146,12 @@ export default function Home() {
         return <Rules />
       case 'projects':
         return <Projects />
+      case 'settings':
+        return <SettingsView />
+      case 'apikeys':
+        return <ApiKeys />
+      case 'audit':
+        return <AuditLog />
       default:
         return <Dashboard />
     }
@@ -145,6 +182,9 @@ export default function Home() {
       })}
     </nav>
   )
+
+  const standardsCount = dash?.standardsCount ?? statsQ.data?.total ?? null
+  const rulesCount = dash?.rulesCount ?? null
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -190,7 +230,25 @@ export default function Home() {
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden items-center gap-1.5 rounded-md border bg-card px-2.5 py-1 text-xs text-muted-foreground sm:flex">
+            {/* Organization / plan badge */}
+            {orgQ.data ? (
+              <button
+                type="button"
+                onClick={() => setView('settings')}
+                className="hidden items-center gap-1.5 rounded-md border bg-card px-2.5 py-1 text-xs font-medium transition-colors hover:bg-accent sm:flex"
+                title={`${orgQ.data.name} · план: ${PLAN_LABELS[orgQ.data.plan] ?? orgQ.data.plan}`}
+              >
+                <Sparkles className="size-3 text-emerald-500" />
+                <span className="text-muted-foreground">{orgQ.data.slug}</span>
+                <Badge
+                  variant="outline"
+                  className={cn('text-[10px]', PLAN_BADGE_CLS[orgQ.data.plan] ?? PLAN_BADGE_CLS.free)}
+                >
+                  {PLAN_LABELS[orgQ.data.plan] ?? orgQ.data.plan}
+                </Badge>
+              </button>
+            ) : null}
+            <div className="hidden items-center gap-1.5 rounded-md border bg-card px-2.5 py-1 text-xs text-muted-foreground lg:flex">
               <CircleDot className="size-3 text-emerald-500" />
               Система активна
             </div>
@@ -215,7 +273,7 @@ export default function Home() {
       {/* Body: sidebar + main */}
       <div className="flex flex-1">
         {!isMobile ? (
-          <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 border-r bg-card/40 md:block">
+          <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 overflow-y-auto border-r bg-card/40 md:block">
             <div className="flex h-full flex-col">
               {navList}
               <div className="mt-auto border-t p-3 text-[10px] text-muted-foreground">
@@ -223,6 +281,11 @@ export default function Home() {
                 <div className="mt-0.5">
                   Документов в системе: {dash ? dash.totalDocuments : '…'}
                 </div>
+                {orgQ.data ? (
+                  <div className="mt-0.5">
+                    Организация: <span className="font-medium">{orgQ.data.slug}</span>
+                  </div>
+                ) : null}
               </div>
             </div>
           </aside>
@@ -241,7 +304,9 @@ export default function Home() {
             <span className="rounded border px-1.5 py-0.5">Регистр РФ</span>
           </div>
           <div>
-            База знаний: 25 стандартов · 23 правила активны
+            База знаний: {standardsCount != null ? standardsCount : '…'} стандартов
+            {' · '}
+            {rulesCount != null ? rulesCount : '…'} правил активны
           </div>
         </div>
       </footer>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { mapDocument } from '@/app/api/_map'
+import { logAudit } from '@/lib/audit'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
@@ -132,6 +133,22 @@ export async function POST(req: NextRequest) {
         stage: 'upload',
         status: 'success',
         message: `Загружен файл ${file.name} (${file.size} байт)`,
+      },
+    })
+
+    await logAudit({
+      organizationId: doc.organizationId ?? null,
+      action: 'document.upload',
+      resourceType: 'document',
+      resourceId: doc.id,
+      details: {
+        name: doc.name,
+        originalName: doc.originalName,
+        mimeType: doc.mimeType,
+        size: doc.size,
+        format: doc.format,
+        sourceType: doc.sourceType,
+        projectId: doc.projectId,
       },
     })
 

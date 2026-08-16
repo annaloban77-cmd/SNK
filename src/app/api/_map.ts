@@ -8,6 +8,12 @@ import type {
   RuleDto,
   StandardDto,
   StampFields,
+  OrganizationDto,
+  UserDto,
+  ApiKeyDto,
+  AuditLogDto,
+  SubscriptionDto,
+  StandardClauseDto,
 } from '@/lib/types'
 import type { ExtractedStamp } from '@/lib/zai'
 
@@ -164,9 +170,12 @@ type StandardWithRules = {
   description: string | null
   status: string
   publishedAt: string | null
+  category: string | null
+  source?: string | null
+  sourceUrl: string | null
   createdAt: Date
   updatedAt: Date
-  _count?: { rules: number }
+  _count?: { rules: number; clauses?: number }
   rules?: RuleWithRelations[]
 }
 
@@ -181,6 +190,10 @@ export function mapStandard(s: StandardWithRules, withRules = false): StandardDt
     status: s.status as StandardDto['status'],
     publishedAt: s.publishedAt,
     rulesCount: s._count?.rules ?? (s.rules?.length ?? 0),
+    category: s.category ?? null,
+    source: s.source ?? 'manual',
+    sourceUrl: s.sourceUrl ?? null,
+    clausesCount: s._count?.clauses ?? 0,
     createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : new Date(s.createdAt).toISOString(),
     updatedAt: s.updatedAt instanceof Date ? s.updatedAt.toISOString() : new Date(s.updatedAt).toISOString(),
     // extend with rules for /api/standards/[id]
@@ -200,4 +213,200 @@ export function stampToStorage(s: ExtractedStamp | null): string | null {
 export function iso(d: Date | string): string {
   if (d instanceof Date) return d.toISOString()
   return new Date(d).toISOString()
+}
+
+// ============ MONETIZATION MAPPERS (Task 3-a) ============
+
+type OrgWithCounts = {
+  id: string
+  name: string
+  slug: string
+  inn: string | null
+  contactEmail: string | null
+  contactPhone: string | null
+  plan: string
+  maxDocuments: number
+  maxChecks: number
+  maxUsers: number
+  status: string
+  trialEndsAt: Date | string | null
+  createdAt: Date | string
+  updatedAt: Date | string
+  _count?: { documents: number; users: number; apiKeys: number }
+  documentsCount?: number
+  checksThisMonth?: number
+}
+
+export function mapOrganization(o: OrgWithCounts): OrganizationDto {
+  const documentsCount = o._count?.documents ?? o.documentsCount ?? 0
+  const usersCount = o._count?.users ?? 0
+  const apiKeysCount = o._count?.apiKeys ?? 0
+  return {
+    id: o.id,
+    name: o.name,
+    slug: o.slug,
+    inn: o.inn,
+    contactEmail: o.contactEmail,
+    contactPhone: o.contactPhone,
+    plan: o.plan as OrganizationDto['plan'],
+    maxDocuments: o.maxDocuments,
+    maxChecks: o.maxChecks,
+    maxUsers: o.maxUsers,
+    status: o.status as OrganizationDto['status'],
+    trialEndsAt: o.trialEndsAt ? iso(o.trialEndsAt) : null,
+    createdAt: iso(o.createdAt),
+    updatedAt: iso(o.updatedAt),
+    documentsCount,
+    checksThisMonth: o.checksThisMonth ?? 0,
+    usersCount,
+    apiKeysCount,
+  }
+}
+
+type UserRow = {
+  id: string
+  email: string
+  name: string | null
+  role: string
+  organizationId: string | null
+  status: string
+  lastLoginAt: Date | string | null
+  createdAt: Date | string
+  updatedAt: Date | string
+}
+
+export function mapUser(u: UserRow): UserDto {
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role as UserDto['role'],
+    organizationId: u.organizationId,
+    status: u.status as UserDto['status'],
+    lastLoginAt: u.lastLoginAt ? iso(u.lastLoginAt) : null,
+    createdAt: iso(u.createdAt),
+    updatedAt: iso(u.updatedAt),
+  }
+}
+
+type ApiKeyRow = {
+  id: string
+  organizationId: string
+  name: string
+  keyPrefix: string
+  scopes: string
+  requestsCount: number
+  requestsLimit: number
+  periodStart: Date | string
+  lastUsedAt: Date | string | null
+  expiresAt: Date | string | null
+  status: string
+  createdAt: Date | string
+  updatedAt: Date | string
+}
+
+export function mapApiKey(k: ApiKeyRow): ApiKeyDto {
+  return {
+    id: k.id,
+    organizationId: k.organizationId,
+    name: k.name,
+    keyPrefix: k.keyPrefix,
+    scopes: k.scopes,
+    requestsCount: k.requestsCount,
+    requestsLimit: k.requestsLimit,
+    periodStart: iso(k.periodStart),
+    lastUsedAt: k.lastUsedAt ? iso(k.lastUsedAt) : null,
+    expiresAt: k.expiresAt ? iso(k.expiresAt) : null,
+    status: k.status as ApiKeyDto['status'],
+    createdAt: iso(k.createdAt),
+    updatedAt: iso(k.updatedAt),
+  }
+}
+
+type AuditLogRow = {
+  id: string
+  organizationId: string | null
+  userId: string | null
+  action: string
+  resourceType: string | null
+  resourceId: string | null
+  details: string | null
+  ipAddress: string | null
+  userAgent: string | null
+  createdAt: Date | string
+  user?: { id: string; email: string; name: string | null } | null
+}
+
+export function mapAuditLog(a: AuditLogRow): AuditLogDto {
+  return {
+    id: a.id,
+    organizationId: a.organizationId,
+    userId: a.userId,
+    action: a.action,
+    resourceType: a.resourceType,
+    resourceId: a.resourceId,
+    details: a.details,
+    ipAddress: a.ipAddress,
+    userAgent: a.userAgent,
+    createdAt: iso(a.createdAt),
+    user: a.user ? { id: a.user.id, email: a.user.email, name: a.user.name } : null,
+  }
+}
+
+type SubscriptionRow = {
+  id: string
+  organizationId: string
+  plan: string
+  status: string
+  amount: number
+  currency: string
+  interval: string
+  currentPeriodStart: Date | string
+  currentPeriodEnd: Date | string | null
+  cancelAt: Date | string | null
+  paymentProvider: string | null
+  externalId: string | null
+  createdAt: Date | string
+  updatedAt: Date | string
+}
+
+export function mapSubscription(s: SubscriptionRow): SubscriptionDto {
+  return {
+    id: s.id,
+    organizationId: s.organizationId,
+    plan: s.plan as SubscriptionDto['plan'],
+    status: s.status as SubscriptionDto['status'],
+    amount: s.amount,
+    currency: s.currency,
+    interval: s.interval as SubscriptionDto['interval'],
+    currentPeriodStart: iso(s.currentPeriodStart),
+    currentPeriodEnd: s.currentPeriodEnd ? iso(s.currentPeriodEnd) : null,
+    cancelAt: s.cancelAt ? iso(s.cancelAt) : null,
+    paymentProvider: s.paymentProvider,
+    externalId: s.externalId,
+    createdAt: iso(s.createdAt),
+    updatedAt: iso(s.updatedAt),
+  }
+}
+
+type StandardClauseRow = {
+  id: string
+  standardId: string
+  number: string
+  title: string
+  text: string
+  severity: string
+  createdAt: Date | string
+}
+
+export function mapStandardClause(c: StandardClauseRow): StandardClauseDto {
+  return {
+    id: c.id,
+    standardId: c.standardId,
+    number: c.number,
+    title: c.title,
+    text: c.text,
+    severity: c.severity as StandardClauseDto['severity'],
+    createdAt: iso(c.createdAt),
+  }
 }

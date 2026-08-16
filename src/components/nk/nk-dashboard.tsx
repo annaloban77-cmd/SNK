@@ -39,8 +39,11 @@ import {
   TrendingUp,
   ArrowRight,
   Activity,
+  BookOpen,
+  ListChecks,
+  Library,
 } from 'lucide-react'
-import { useDashboard } from '@/hooks/use-nk-api'
+import { useDashboard, useStandardsStats } from '@/hooks/use-nk-api'
 import { StatCard } from './nk-stat-card'
 import { PageHeader } from './nk-page-header'
 import { EmptyState, ErrorState } from './nk-empty-state'
@@ -64,6 +67,7 @@ const STATUS_CHART_CONFIG: ChartConfig = {
 
 export function Dashboard() {
   const { data, isLoading, isError, refetch } = useDashboard()
+  const statsQ = useStandardsStats()
   const setView = useNKStore((s) => s.setView)
   const selectDocument = useNKStore((s) => s.selectDocument)
 
@@ -77,6 +81,11 @@ export function Dashboard() {
   }
 
   const stats = data
+  const standardsCount = stats?.standardsCount ?? statsQ.data?.total ?? 0
+  const rulesCount = stats?.rulesCount ?? 0
+  const categoriesCount =
+    stats?.categoriesCount ??
+    (statsQ.data?.byCategory ?? []).filter((c) => c.category && c.category !== 'unknown').length
 
   return (
     <div className="space-y-6">
@@ -142,6 +151,60 @@ export function Dashboard() {
           hint="Усреднение по проанализированным документам"
         />
       </div>
+
+      {/* Knowledge Base health */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900">
+                <Library className="size-4" />
+              </div>
+              <div>
+                <CardTitle className="text-base">База знаний</CardTitle>
+                <CardDescription>
+                  Нормативное обеспечение системы
+                </CardDescription>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setView('knowledge')}
+            >
+              Открыть <ArrowRight className="size-3.5" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <KBStat
+              label="Стандартов"
+              value={standardsCount}
+              loading={statsQ.isLoading && !stats?.standardsCount}
+              icon={<BookOpen className="size-4" />}
+            />
+            <KBStat
+              label="Правил"
+              value={rulesCount}
+              loading={isLoading && !stats?.rulesCount}
+              icon={<ListChecks className="size-4" />}
+            />
+            <KBStat
+              label="Категорий"
+              value={categoriesCount}
+              loading={statsQ.isLoading && !stats?.categoriesCount}
+              icon={<Library className="size-4" />}
+            />
+            <KBStat
+              label="Действующих"
+              value={statsQ.data?.activeCount ?? 0}
+              loading={statsQ.isLoading}
+              icon={<CheckCircle2 className="size-4" />}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -392,6 +455,34 @@ export function Dashboard() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  )
+}
+
+function KBStat({
+  label,
+  value,
+  loading,
+  icon,
+}: {
+  label: string
+  value: number
+  loading?: boolean
+  icon: React.ReactNode
+}) {
+  return (
+    <div className="rounded-md border bg-muted/30 p-3">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        <span className="text-[10px] font-medium uppercase tracking-wide">
+          {label}
+        </span>
+      </div>
+      {loading ? (
+        <Skeleton className="mt-1.5 h-6 w-16" />
+      ) : (
+        <div className="mt-1 text-xl font-bold tabular-nums">{value}</div>
+      )}
     </div>
   )
 }
