@@ -700,3 +700,72 @@ export const ISSUE_STATUS_LABEL: Record<IssueStatus, string> = {
   rejected: 'Отклонено',
   fixed: 'Исправлено',
 }
+
+// ===== BENCH =====
+export interface BenchStatus {
+  lastRun: {
+    id: string; version: string; status: string; benchStatus: string | null
+    recall: number | null; precision: number | null; recallHigh: number | null
+    coordAccuracy: number | null
+    totalSamples: number; passedSamples: number; failedSamples: number
+    totalExpected: number; totalFound: number; totalMatched: number
+    totalFalsePos: number; totalFalseNeg: number
+    durationMs: number | null; startedAt: string; finishedAt: string | null
+    findingsCount: number
+  } | null
+  runningRun: { id: string; version: string; startedAt: string } | null
+  samples: { total: number; correct: number; withErrors: number }
+  history: {
+    id: string; version: string; benchStatus: string | null
+    recall: number | null; precision: number | null; recallHigh: number | null
+    passedSamples: number; failedSamples: number; totalSamples: number
+    durationMs: number | null; startedAt: string
+  }[]
+}
+
+export function useBenchStatus() {
+  return useQuery<BenchStatus>({
+    queryKey: ['bench-status'],
+    queryFn: () => apiFetch<BenchStatus>('/api/bench/run'),
+    refetchInterval: 5000, // авто-рефреш каждые 5с (для отслеживания прогресса)
+  })
+}
+
+export function useRunBench() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (vars: { runLlm?: boolean; version?: string }) =>
+      apiFetch<{ success: boolean; runId: string }>('/api/bench/run', {
+        method: 'POST',
+        body: JSON.stringify(vars),
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['bench-status'] })
+      toast.success('Прогон стенда запущен')
+    },
+    onError: (e: Error) => toast.error('Ошибка запуска: ' + e.message),
+  })
+}
+
+export function useBenchResults(runId?: string) {
+  return useQuery({
+    queryKey: ['bench-results', runId],
+    queryFn: () => apiFetch<any>(`/api/bench/results/${runId}`),
+    enabled: !!runId,
+  })
+}
+
+export function useBenchResultsList(page = 1, pageSize = 20) {
+  return useQuery({
+    queryKey: ['bench-results-list', page, pageSize],
+    queryFn: () => apiFetch<any>(`/api/bench/results?page=${page}&pageSize=${pageSize}`),
+  })
+}
+
+export function useBenchSamples(category?: string) {
+  const qs = category && category !== 'all' ? `?category=${category}` : ''
+  return useQuery({
+    queryKey: ['bench-samples', category],
+    queryFn: () => apiFetch<any>(`/api/bench/samples${qs}`),
+  })
+}

@@ -1,0 +1,14 @@
+{
+  "code": "E-016",
+  "sample": "E-016",
+  "findings": [
+    {
+      "code": "R-LETTER-001",
+      "title": "Нестандартная литера",
+      "severity": "low",
+      "field": "Литера",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

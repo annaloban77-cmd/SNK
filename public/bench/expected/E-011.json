@@ -1,0 +1,14 @@
+{
+  "code": "E-011",
+  "sample": "E-011",
+  "findings": [
+    {
+      "code": "R-LETTER-001",
+      "title": "Литера не указана",
+      "severity": "medium",
+      "field": "Литера",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

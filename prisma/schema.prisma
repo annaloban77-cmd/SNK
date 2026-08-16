@@ -273,3 +273,95 @@ model Subscription {
   updatedAt       DateTime @updatedAt
 }
 
+// ============ BENCH (СТЕНД) — главный предохранитель релиза ============
+
+// Эталонный/контрольный документ для стенда
+model BenchSample {
+  id              String   @id @default(cuid())
+  code            String   @unique // "S-001", "E-042"
+  title           String   // описание семпла
+  category        String   // тип: "correct" | "with_errors"
+  documentType    String   // "drawing" | "assembly" | "specification" | "welding" | "circuit" | "cad"
+  format          String   // A4 | A3 | A2 | A1 | A0
+  sourceType      String   // "scan" | "pdf" | "dwg" | "dxf" | "cdw" | "sldprt" | "sldasm" | "slddrw" | "spw"
+  filePath        String   // путь к файлу семпла (public/bench/samples/...)
+  expectedFindings String? // JSON-строка с ожидаемыми замечаниями (для with_errors)
+  expectedCount   Int      @default(0) // сколько ошибок заложено
+  expectedHigh    Int      @default(0)
+  expectedMedium  Int      @default(0)
+  expectedLow     Int      @default(0)
+  // Категории ожидаемых ошибок (для аналитики)
+  expectedCategories String? // JSON: ["stamp","material","welding",...]
+  description     String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  findings        BenchFinding[]
+
+  @@index([category])
+  @@index([documentType])
+  @@index([isActive])
+}
+
+// Один прогон стенда (запуск всех активных семплов)
+model BenchRun {
+  id              String   @id @default(cuid())
+  version         String   // версия ядра/правил (например "0.2.1")
+  status          String   @default("running") // running | completed | failed | aborted
+  startedAt       DateTime @default(now())
+  finishedAt      DateTime?
+  durationMs      Int?
+  // Метрики агрегированные
+  totalSamples    Int      @default(0)
+  passedSamples   Int      @default(0) // семплы где Recall>=90% Precision>=85%
+  failedSamples   Int      @default(0)
+  // Recall/Precision по всему прогону
+  recall          Float?   // 0..1, доля ожидаемых ошибок найденных
+  precision       Float?   // 0..1, доля найденных соответствующих ожиданиям
+  recallHigh      Float?   // Recall только по высококритичным
+  coordAccuracy   Float?   // среднее отклонение в мм (меньше = лучше)
+  // Статус «зелёный/жёлтый/красный»
+  benchStatus     String?  // "green" | "yellow" | "red"
+  // Сводка
+  totalExpected   Int      @default(0)
+  totalFound      Int      @default(0)
+  totalMatched    Int      @default(0) // истинные срабатывания
+  totalFalsePos   Int      @default(0) // ложные срабатывания
+  totalFalseNeg   Int      @default(0) // пропущенные
+  notes           String?
+  findings        BenchFinding[]
+
+  @@index([status])
+  @@index([startedAt])
+}
+
+// Результат проверки одного семпла в рамках прогона
+model BenchFinding {
+  id              String   @id @default(cuid())
+  runId           String
+  sampleId        String
+  // Что нашла система
+  foundCode       String?  // код правила
+  foundTitle      String?
+  foundSeverity   String?  // high | medium | low
+  foundField      String?
+  // Ожидаемая ошибка (если matched)
+  expectedCode    String?
+  expectedTitle   String?
+  expectedSeverity String?
+  // Соответствие
+  status          String   // "matched" | "false_positive" | "false_negative" | "expected_only"
+  // Координаты (для проверки координатной точности)
+  expectedX       Float?
+  expectedY       Float?
+  foundX          Float?
+  foundY          Float?
+  coordDelta      Float?   // расстояние в мм (если применимо)
+  createdAt       DateTime @default(now())
+  run             BenchRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sample          BenchSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([sampleId])
+  @@index([status])
+}
+

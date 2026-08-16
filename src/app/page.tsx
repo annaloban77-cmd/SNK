@@ -29,6 +29,7 @@ import {
   KeyRound,
   History,
   Sparkles,
+  FlaskConical,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNKStore, type NKView } from '@/stores/nk-store'
@@ -48,6 +49,7 @@ import { Projects } from '@/components/nk/nk-projects'
 import { Settings as SettingsView } from '@/components/nk/nk-settings'
 import { ApiKeys } from '@/components/nk/nk-api-keys'
 import { AuditLog } from '@/components/nk/nk-audit-log'
+import { Bench } from '@/components/nk/nk-bench'
 
 interface NavItem {
   id: NKView
@@ -122,6 +124,7 @@ export default function Home() {
     { id: 'settings', label: 'Настройки', icon: <Settings className="size-4" /> },
     { id: 'apikeys', label: 'API-ключи', icon: <KeyRound className="size-4" /> },
     { id: 'audit', label: 'Аудит', icon: <History className="size-4" /> },
+    { id: 'bench', label: 'Стенд', icon: <FlaskConical className="size-4" /> },
   ]
 
   function handleNav(v: NKView) {
@@ -152,6 +155,8 @@ export default function Home() {
         return <ApiKeys />
       case 'audit':
         return <AuditLog />
+      case 'bench':
+        return <Bench />
       default:
         return <Dashboard />
     }

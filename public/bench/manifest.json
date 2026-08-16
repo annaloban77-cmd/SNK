@@ -1,0 +1,1306 @@
+[
+  {
+    "code": "S-001",
+    "title": "Кронштейн (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-002",
+    "title": "Фланец (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-003",
+    "title": "Опора (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-004",
+    "title": "Крышка (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-005",
+    "title": "Вал (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-006",
+    "title": "Втулка (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-007",
+    "title": "Обечайка (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-008",
+    "title": "Днище (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-009",
+    "title": "Переборка (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-010",
+    "title": "Палуба (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-011",
+    "title": "Шпангоут (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-012",
+    "title": "Стрингер (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-013",
+    "title": "Карлингс (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-014",
+    "title": "Бимс (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-015",
+    "title": "Флор (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-016",
+    "title": "Пиллерс (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-017",
+    "title": "Брашпиль (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-018",
+    "title": "Кнехт (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-019",
+    "title": "Клюз (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-020",
+    "title": "Рым (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-021",
+    "title": "Кронштейн (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-022",
+    "title": "Фланец (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-023",
+    "title": "Опора (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-024",
+    "title": "Крышка (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-025",
+    "title": "Вал (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-026",
+    "title": "Втулка (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-027",
+    "title": "Обечайка (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-028",
+    "title": "Днище (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-029",
+    "title": "Переборка (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-030",
+    "title": "Палуба (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-031",
+    "title": "Шпангоут (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-032",
+    "title": "Стрингер (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-033",
+    "title": "Карлингс (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-034",
+    "title": "Бимс (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-035",
+    "title": "Флор (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-036",
+    "title": "Пиллерс (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-037",
+    "title": "Брашпиль (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-038",
+    "title": "Кнехт (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-039",
+    "title": "Клюз (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-040",
+    "title": "Рым (эталон, A3)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-041",
+    "title": "Кронштейн (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-042",
+    "title": "Фланец (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-043",
+    "title": "Опора (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-044",
+    "title": "Крышка (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-045",
+    "title": "Вал (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-046",
+    "title": "Втулка (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-047",
+    "title": "Обечайка (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-048",
+    "title": "Днище (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-049",
+    "title": "Переборка (эталон, A2)",
+    "category": "correct",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "S-050",
+    "title": "Палуба (эталон, A4)",
+    "category": "correct",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "E-001",
+    "title": "Втулка (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass"
+    ]
+  },
+  {
+    "code": "E-002",
+    "title": "Обечайка (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-003",
+    "title": "Днище (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 2,
+    "expectedHigh": 1,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-004",
+    "title": "Переборка (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-005",
+    "title": "Палуба (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-006",
+    "title": "Шпангоут (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-007",
+    "title": "Стрингер (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "E-008",
+    "title": "Карлингс (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "E-009",
+    "title": "Бимс (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "scale"
+    ]
+  },
+  {
+    "code": "E-010",
+    "title": "Флор (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-011",
+    "title": "Пиллерс (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "letter"
+    ]
+  },
+  {
+    "code": "E-012",
+    "title": "Брашпиль (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stage"
+    ]
+  },
+  {
+    "code": "E-013",
+    "title": "Кнехт (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "tt"
+    ]
+  },
+  {
+    "code": "E-014",
+    "title": "Клюз (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "gost"
+    ]
+  },
+  {
+    "code": "E-015",
+    "title": "Рым (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 3,
+    "expectedHigh": 1,
+    "expectedMedium": 1,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass",
+      "mat",
+      "sign"
+    ]
+  },
+  {
+    "code": "E-016",
+    "title": "Кронштейн (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "letter"
+    ]
+  },
+  {
+    "code": "E-017",
+    "title": "Фланец (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-018",
+    "title": "Опора (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass"
+    ]
+  },
+  {
+    "code": "E-019",
+    "title": "Крышка (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass"
+    ]
+  },
+  {
+    "code": "E-020",
+    "title": "Вал (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-021",
+    "title": "Втулка (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 2,
+    "expectedHigh": 1,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-022",
+    "title": "Обечайка (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-023",
+    "title": "Днище (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-024",
+    "title": "Переборка (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-025",
+    "title": "Палуба (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "E-026",
+    "title": "Шпангоут (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "E-027",
+    "title": "Стрингер (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "scale"
+    ]
+  },
+  {
+    "code": "E-028",
+    "title": "Карлингс (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-029",
+    "title": "Бимс (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "letter"
+    ]
+  },
+  {
+    "code": "E-030",
+    "title": "Флор (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stage"
+    ]
+  },
+  {
+    "code": "E-031",
+    "title": "Пиллерс (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "tt"
+    ]
+  },
+  {
+    "code": "E-032",
+    "title": "Брашпиль (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "gost"
+    ]
+  },
+  {
+    "code": "E-033",
+    "title": "Кнехт (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 3,
+    "expectedHigh": 1,
+    "expectedMedium": 1,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass",
+      "mat",
+      "sign"
+    ]
+  },
+  {
+    "code": "E-034",
+    "title": "Клюз (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "letter"
+    ]
+  },
+  {
+    "code": "E-035",
+    "title": "Рым (с ошибками, A4)",
+    "category": "with_errors",
+    "format": "A4",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-036",
+    "title": "Кронштейн (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass"
+    ]
+  },
+  {
+    "code": "E-037",
+    "title": "Фланец (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass"
+    ]
+  },
+  {
+    "code": "E-038",
+    "title": "Опора (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-039",
+    "title": "Крышка (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 2,
+    "expectedHigh": 1,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-040",
+    "title": "Вал (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-041",
+    "title": "Втулка (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-042",
+    "title": "Обечайка (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "E-043",
+    "title": "Днище (с ошибками, A3)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "E-044",
+    "title": "Переборка (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "E-045",
+    "title": "Палуба (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "scale"
+    ]
+  },
+  {
+    "code": "E-046",
+    "title": "Шпангоут (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "E-047",
+    "title": "Стрингер (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "letter"
+    ]
+  },
+  {
+    "code": "E-048",
+    "title": "Карлингс (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stage"
+    ]
+  },
+  {
+    "code": "E-049",
+    "title": "Бимс (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "tt"
+    ]
+  },
+  {
+    "code": "E-050",
+    "title": "Флор (с ошибками, A2)",
+    "category": "with_errors",
+    "format": "A2",
+    "sourceType": "scan",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "gost"
+    ]
+  }
+]

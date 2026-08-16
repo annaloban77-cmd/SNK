@@ -1,0 +1,14 @@
+{
+  "code": "E-028",
+  "sample": "E-028",
+  "findings": [
+    {
+      "code": "R-MAT-001",
+      "title": "Не указан материал",
+      "severity": "high",
+      "field": "Материал",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "code": "E-047",
+  "sample": "E-047",
+  "findings": [
+    {
+      "code": "R-LETTER-001",
+      "title": "Литера не указана",
+      "severity": "medium",
+      "field": "Литера",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}

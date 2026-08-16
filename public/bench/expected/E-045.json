@@ -1,0 +1,14 @@
+{
+  "code": "E-045",
+  "sample": "E-045",
+  "findings": [
+    {
+      "code": "R-SCALE-001",
+      "title": "Нестандартный масштаб",
+      "severity": "low",
+      "field": "Масштаб",
+      "x": 0,
+      "y": 0
+    }
+  ]
+}
