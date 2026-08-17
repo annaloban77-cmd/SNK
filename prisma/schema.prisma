@@ -370,3 +370,99 @@ model BenchFinding {
   @@index([sourceOcr])
 }
 
+// ============ СПРАВОЧНИКИ (Блок 3) ============
+
+model Material {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  category  String   // steel | bronze | brass | aluminum | polymer
+  params    String?  // JSON: {grade, tensile, yield, elongation, impact}
+  createdAt DateTime @default(now())
+  @@index([category])
+  @@index([gost])
+}
+
+model Fastener {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // bolt | nut | washer | screw | stud
+  params    String?  // JSON: {diameter, length, pitch, grade, coating}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model Bearing {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  params    String?  // JSON: {innerD, outerD, width, type}
+  createdAt DateTime @default(now())
+  @@index([gost])
+}
+
+model RolledProduct {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // sheet | bar | angle | channel | beam | pipe
+  params    String?  // JSON: {thickness, width, length, diameter, wallThickness}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model WeldingMaterial {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // electrode | wire | flux
+  params    String?  // JSON: {grade, coating, diameter}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model Coating {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // primer | enamel | putty | powder
+  params    String?  // JSON: {color, thickness, compatibleWith}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model PipeFitting {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // flange | elbow | tee | reducer | cap | valve
+  params    String?  // JSON: {diameter, pressure, material}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model ShipEquipment {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // pump | separator | anchor | winch | valve
+  params    String?  // JSON: {capacity, pressure, material}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
