@@ -275,27 +275,27 @@ async function main() {
     idx++
   }
 
-  // 10 DXF samples with errors
+  // 10 DXF samples with errors — координаты в мм (ГОСТ 2.104 форма 1)
   const errorTemplates = [
-    { errors: [{ code: 'R-MASS-001', title: 'Лишняя точка после единицы массы', severity: 'low', field: 'Масса' }],
+    { errors: [{ code: 'R-MASS-001', title: 'Лишняя точка после единицы массы', severity: 'low', field: 'Масса', x: 130, y: 5 }],
       overrides: (rng: () => number) => ({ mass: `${(rng() * 30 + 0.5).toFixed(1)} кг.` }) },
-    { errors: [{ code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал' }],
+    { errors: [{ code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 100, y: 5 }],
       overrides: () => ({ material: 'Сталь 09Г2С' }) },
-    { errors: [{ code: 'R-SIGN-003', title: 'Отсутствует подпись нормоконтролера', severity: 'high', field: 'Подписи' }],
+    { errors: [{ code: 'R-SIGN-003', title: 'Отсутствует подпись нормоконтролера', severity: 'high', field: 'Подписи', x: 70, y: 25 }],
       overrides: () => ({ normControl: '' }) },
-    { errors: [{ code: 'R-SIGN-004', title: 'Отсутствует подпись утверждающего', severity: 'medium', field: 'Подписи' }],
+    { errors: [{ code: 'R-SIGN-004', title: 'Отсутствует подпись утверждающего', severity: 'medium', field: 'Подписи', x: 70, y: 15 }],
       overrides: () => ({ approved: '' }) },
-    { errors: [{ code: 'R-SIGN-001', title: 'Отсутствует подпись разработчика', severity: 'high', field: 'Подписи' }],
+    { errors: [{ code: 'R-SIGN-001', title: 'Отсутствует подпись разработчика', severity: 'high', field: 'Подписи', x: 70, y: 40 }],
       overrides: () => ({ developed: '' }) },
-    { errors: [{ code: 'R-STAMP-003', title: 'Отсутствует наименование изделия', severity: 'high', field: 'Наименование' }],
+    { errors: [{ code: 'R-STAMP-003', title: 'Отсутствует наименование изделия', severity: 'high', field: 'Наименование', x: 100, y: 8 }],
       overrides: () => ({ name: '' }) },
-    { errors: [{ code: 'R-SCALE-001', title: 'Нестандартный масштаб', severity: 'low', field: 'Масштаб' }],
+    { errors: [{ code: 'R-SCALE-001', title: 'Нестандартный масштаб', severity: 'low', field: 'Масштаб', x: 100, y: 5 }],
       overrides: () => ({ scale: '1:3' }) },
-    { errors: [{ code: 'R-MAT-001', title: 'Не указан материал', severity: 'high', field: 'Материал' }],
+    { errors: [{ code: 'R-MAT-001', title: 'Не указан материал', severity: 'high', field: 'Материал', x: 100, y: 5 }],
       overrides: () => ({ material: '' }) },
-    { errors: [{ code: 'R-LETTER-001', title: 'Литера не указана', severity: 'medium', field: 'Литера' }],
+    { errors: [{ code: 'R-LETTER-001', title: 'Литера не указана', severity: 'medium', field: 'Литера', x: 160, y: 10 }],
       overrides: () => ({ letter: '' }) },
-    { errors: [{ code: 'R-STAGE-001', title: 'Стадия не указана', severity: 'medium', field: 'Стадия' }],
+    { errors: [{ code: 'R-STAGE-001', title: 'Стадия не указана', severity: 'medium', field: 'Стадия', x: 160, y: 5 }],
       overrides: () => ({ stage: '' }) },
   ]
 

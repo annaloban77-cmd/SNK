@@ -241,64 +241,64 @@ async function main() {
   // Каждый — с 1-3 заложенными ошибками
   const errorTemplates = [
     // 1. Масса с лишней точкой
-    { errors: [{ code: 'R-MASS-001', title: 'Лишняя точка после единицы массы', severity: 'low', field: 'Масса', x: 0, y: 0 }],
+    { errors: [{ code: 'R-MASS-001', title: 'Лишняя точка после единицы массы', severity: 'low', field: 'Масса', x: 130, y: 5 }],
       overrides: (rng: () => number) => ({ mass: `${(rng()*30+0.5).toFixed(1)} кг.` }) },
     // 2. Материал без ГОСТ
-    { errors: [{ code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 0, y: 0 }],
+    { errors: [{ code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 100, y: 5 }],
       overrides: () => ({ material: 'Сталь 09Г2С' }) },
     // 3. Материал без ГОСТ + нет в перечне
     { errors: [
-        { code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 0, y: 0 },
+        { code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 100, y: 5 },
       ],
       overrides: () => ({ material: 'Сталь 09Г2С', gostRefs: ['ГОСТ 2.307-2011', 'ГОСТ 2.309-73'] }) },
     // 4. Нет подписи нормоконтролера
-    { errors: [{ code: 'R-SIGN-003', title: 'Отсутствует подпись нормоконтролера', severity: 'high', field: 'Подписи', x: 0, y: 0 }],
+    { errors: [{ code: 'R-SIGN-003', title: 'Отсутствует подпись нормоконтролера', severity: 'high', field: 'Подписи', x: 70, y: 25 }],
       overrides: () => ({ normControl: '' }) },
     // 5. Нет подписи утверждающего
-    { errors: [{ code: 'R-SIGN-004', title: 'Отсутствует подпись утверждающего', severity: 'medium', field: 'Подписи', x: 0, y: 0 }],
+    { errors: [{ code: 'R-SIGN-004', title: 'Отсутствует подпись утверждающего', severity: 'medium', field: 'Подписи', x: 70, y: 15 }],
       overrides: () => ({ approved: '' }) },
     // 6. Нет подписи разработчика
-    { errors: [{ code: 'R-SIGN-001', title: 'Отсутствует подпись разработчика', severity: 'high', field: 'Подписи', x: 0, y: 0 }],
+    { errors: [{ code: 'R-SIGN-001', title: 'Отсутствует подпись разработчика', severity: 'high', field: 'Подписи', x: 70, y: 40 }],
       overrides: () => ({ developed: '' }) },
     // 7. Нет наименования
-    { errors: [{ code: 'R-STAMP-003', title: 'Отсутствует наименование изделия', severity: 'high', field: 'Наименование', x: 0, y: 0 }],
+    { errors: [{ code: 'R-STAMP-003', title: 'Отсутствует наименование изделия', severity: 'high', field: 'Наименование', x: 100, y: 8 }],
       overrides: () => ({ name: '' }) },
     // 8. Нет обозначения
-    { errors: [{ code: 'R-STAMP-001', title: 'Отсутствует обозначение документа', severity: 'high', field: 'Обозначение', x: 0, y: 0 }],
+    { errors: [{ code: 'R-STAMP-001', title: 'Отсутствует обозначение документа', severity: 'high', field: 'Обозначение', x: 5, y: 5 }],
       overrides: () => ({ designation: '' }) },
     // 9. Нестандартный масштаб 1:3
-    { errors: [{ code: 'R-SCALE-001', title: 'Нестандартный масштаб', severity: 'low', field: 'Масштаб', x: 0, y: 0 }],
+    { errors: [{ code: 'R-SCALE-001', title: 'Нестандартный масштаб', severity: 'low', field: 'Масштаб', x: 100, y: 5 }],
       overrides: () => ({ scale: '1:3' }) },
     // 10. Нет материала
-    { errors: [{ code: 'R-MAT-001', title: 'Не указан материал', severity: 'high', field: 'Материал', x: 0, y: 0 }],
+    { errors: [{ code: 'R-MAT-001', title: 'Не указан материал', severity: 'high', field: 'Материал', x: 100, y: 5 }],
       overrides: () => ({ material: '' }) },
     // 11. Нет литеры
-    { errors: [{ code: 'R-LETTER-001', title: 'Литера не указана', severity: 'medium', field: 'Литера', x: 0, y: 0 }],
+    { errors: [{ code: 'R-LETTER-001', title: 'Литера не указана', severity: 'medium', field: 'Литера', x: 160, y: 10 }],
       overrides: () => ({ letter: '' }) },
     // 12. Нет стадии
-    { errors: [{ code: 'R-STAGE-001', title: 'Стадия не указана', severity: 'medium', field: 'Стадия', x: 0, y: 0 }],
+    { errors: [{ code: 'R-STAGE-001', title: 'Стадия не указана', severity: 'medium', field: 'Стадия', x: 160, y: 5 }],
       overrides: () => ({ stage: '' }) },
     // 13. Нет ТТ
-    { errors: [{ code: 'R-TT-001', title: 'Отсутствуют технические требования', severity: 'medium', field: 'Технические требования', x: 0, y: 0 }],
+    { errors: [{ code: 'R-TT-001', title: 'Отсутствуют технические требования', severity: 'medium', field: 'Технические требования', x: 5, y: 100 }],
       overrides: () => ({ techReqs: [] }) },
     // 14. Нет перечня ГОСТ
-    { errors: [{ code: 'R-GOST-001', title: 'Отсутствует перечень ссылочных ГОСТ', severity: 'medium', field: 'Перечень ГОСТ', x: 0, y: 0 }],
+    { errors: [{ code: 'R-GOST-001', title: 'Отсутствует перечень ссылочных ГОСТ', severity: 'medium', field: 'Перечень ГОСТ', x: 200, y: 100 }],
       overrides: () => ({ gostRefs: [] }) },
     // 15. Комбинация: масса+материал+подпись
     { errors: [
-        { code: 'R-MASS-001', title: 'Лишняя точка после единицы массы', severity: 'low', field: 'Масса', x: 0, y: 0 },
-        { code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 0, y: 0 },
-        { code: 'R-SIGN-003', title: 'Отсутствует подпись нормоконтролера', severity: 'high', field: 'Подписи', x: 0, y: 0 },
+        { code: 'R-MASS-001', title: 'Лишняя точка после единицы массы', severity: 'low', field: 'Масса', x: 130, y: 5 },
+        { code: 'R-MAT-002', title: 'В обозначении материала нет ГОСТ', severity: 'medium', field: 'Материал', x: 100, y: 5 },
+        { code: 'R-SIGN-003', title: 'Отсутствует подпись нормоконтролера', severity: 'high', field: 'Подписи', x: 70, y: 25 },
       ],
       overrides: (rng: () => number) => ({ mass: `${(rng()*30+0.5).toFixed(1)} кг.`, material: 'Сталь 09Г2С', normControl: '' }) },
     // 16. Нестандартная литера
-    { errors: [{ code: 'R-LETTER-001', title: 'Нестандартная литера', severity: 'low', field: 'Литера', x: 0, y: 0 }],
+    { errors: [{ code: 'R-LETTER-001', title: 'Нестандартная литера', severity: 'low', field: 'Литера', x: 160, y: 10 }],
       overrides: () => ({ letter: 'X' }) },
     // 17. Нет подписи проверившего
-    { errors: [{ code: 'R-SIGN-002', title: 'Отсутствует подпись проверившего', severity: 'high', field: 'Подписи', x: 0, y: 0 }],
+    { errors: [{ code: 'R-SIGN-002', title: 'Отсутствует подпись проверившего', severity: 'high', field: 'Подписи', x: 70, y: 35 }],
       overrides: () => ({ checked: '' }) },
     // 18. Масса без единицы
-    { errors: [{ code: 'R-MASS-001', title: 'Не указана единица измерения массы', severity: 'low', field: 'Масса', x: 0, y: 0 }],
+    { errors: [{ code: 'R-MASS-001', title: 'Не указана единица измерения массы', severity: 'low', field: 'Масса', x: 130, y: 5 }],
       overrides: (rng: () => number) => ({ mass: `${(rng()*30+0.5).toFixed(1)}` }) },
   ]
   

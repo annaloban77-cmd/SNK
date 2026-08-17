@@ -19,6 +19,37 @@ const BENCH_DATA_DIR = process.env.BENCH_DATA_DIR || path.join(process.cwd(), 'p
 // 1. Координатная точность: допуск 5мм
 const COORD_TOLERANCE_MM = 5.0
 
+// Маппинг кода правила → координаты поля в штампе ГОСТ 2.104 (мм, от левого нижнего угла штампа)
+function getRuleCoords(code: string): { x?: number; y?: number } {
+  const c = code.toUpperCase()
+  // Обозначение: нижняя строка, левая часть
+  if (c.startsWith('R-STAMP-001') || c.startsWith('R-STAMP-002')) return { x: 5, y: 5 }
+  // Наименование: центр-низ
+  if (c.startsWith('R-STAMP-003')) return { x: 100, y: 8 }
+  // Масштаб: нижняя строка, центр
+  if (c.startsWith('R-SCALE')) return { x: 100, y: 5 }
+  // Масса: нижняя строка, правее
+  if (c.startsWith('R-MASS')) return { x: 130, y: 5 }
+  // Материал: нижняя строка, центр
+  if (c.startsWith('R-MAT')) return { x: 100, y: 5 }
+  // Литера: правая часть, верх
+  if (c.startsWith('R-LETTER')) return { x: 160, y: 10 }
+  // Стадия: правая часть, низ
+  if (c.startsWith('R-STAGE')) return { x: 160, y: 5 }
+  // Подписи (по конкретной роли)
+  if (c.startsWith('R-SIGN-001')) return { x: 70, y: 40 } // Разраб
+  if (c.startsWith('R-SIGN-002')) return { x: 70, y: 35 } // Пров
+  if (c.startsWith('R-SIGN-003')) return { x: 70, y: 25 } // Н.контр
+  if (c.startsWith('R-SIGN-004')) return { x: 70, y: 15 } // Утв
+  // ТТ: над штампом
+  if (c.startsWith('R-TT')) return { x: 5, y: 100 }
+  // Перечень ГОСТ: справа от ТТ
+  if (c.startsWith('R-GOST')) return { x: 200, y: 100 }
+  // Формат: правый верхний угол штампа
+  if (c.startsWith('R-FORMAT')) return { x: 170, y: 50 }
+  return {}
+}
+
 export interface ExpectedFinding {
   code: string
   title: string
@@ -128,11 +159,13 @@ export async function runSingleSample(sample: {
     }
   }
 
-  // 3. Детерминированные правила
+  // 3. Детерминированные правила (с координатами полей штампа)
   if (stamp) {
     const det = runDeterministicRules(toStampFields(stamp))
     for (const d of det) {
-      foundIssues.push({ ...d, sourceOcr })
+      // Назначаем координаты на основе кода правила (позиция поля в штампе ГОСТ 2.104, мм)
+      const coords = getRuleCoords(d.code)
+      foundIssues.push({ ...d, sourceOcr, ...coords })
     }
 
     // 4. LLM (опционально)
