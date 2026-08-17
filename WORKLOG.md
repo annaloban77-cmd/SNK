@@ -138,3 +138,35 @@ Stage Summary:
 - No-code редактор правил (P4.2)
 - Лендинг «лицо продукта» (P5.3)
 - Интеграция с PLM/webhook (P5.2 — API есть, webhook нет)
+
+---
+## Самоотчёт (часы 0-3)
+
+| Час | Задача | Статус | Метрики бенчей | Решения | Следующее |
+|---|---|---|---|---|---|
+| 0 | P0: git + tar.gz + .env.example | ✅ | — | — | Б1: OCR |
+| 1 | Б1: VLM primary OCR + quality gate | ✅ код | Синт: GREEN 100/100; DXF: GREEN 20/20; REALISTIC: VLM pending | VLM даёт ~85% confidence vs Tesseract 31%; 30s timeout на VLM; qualityScore 0-100 (Laplacian+contrast+DPI+noise) | Б1: REALISTIC bench run |
+| 2 | Б1: REALISTIC bench (10 samples) | VLM running | Синт: GREEN; DXF: GREEN; REALISTIC: pending | VLM слишком медленный для 30 семплов в одном bash timeout; запуск в фоне | Б3-5 параллельно |
+
+### Решения
+1. **VLM как primary OCR**: Tesseract даёт 31% confidence на REALISTIC изображениях — недостаточно для нормативных замечаний. VLM (glm-4.5v) даёт ~85% (проверено на фланце). P5 соблюдён: VLM для извлечения данных (OCR), не для правил.
+2. **local_only_mode**: если true — VLM запрещён, только Tesseract + quality gate. Для бюро с требованиями локализации.
+3. **Quality Gate (0-100)**: контраст (std dev), резкость (Laplacian variance), DPI, шум/чистота. ≥70 принять, 40-70 low-confidence, <40 отклонить.
+4. **REALISTIC tier**: мягкая деградация (перекос 0.3-1°, blur ≤0.5, шум ≤10) — отличается от деградированного (перекос до 3°, blur до 1.2, шум до 35).
+
+### Итоговое состояние бенчей (v1.0)
+- **Синтетический**: 🟢 GREEN — 100/100, Recall 100%, Precision 100%
+- **DXF**: 🟢 GREEN — 20/20, Recall 100%, Precision 100%
+- **REALISTIC**: pending VLM (Tesseract даёт RED: R=6%, P=3%; VLM ожидается ≥85%/≥80%)
+
+### Архитектура v1.0
+- OCR: SVG → VLM (primary) → Tesseract (fallback/local_only) → none
+- CAD: DXF (ATTDEF+TEXT) / DWG (UTF-16LE метаданные) / SolidWorks / КОМПАС
+- Rules: 320 детерминированных + семантических
+- Post-filter: confidence-aware, per-field metadata, ink detection, дедупликация
+- Quality Gate: score 0-100, 4 компонента
+- База знаний: 573 стандарта, 320 правил, 11 категорий
+- Multi-tenant: Organization + roles + API keys + subscription
+- Отчёты: HTML (print A4) + CSV (Excel) + PDF (pending)
+- Feedback loop: отклонённые FP → добавить в бенч
+- API: /api/v1/* с Bearer token
