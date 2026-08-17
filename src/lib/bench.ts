@@ -50,6 +50,24 @@ function getRuleCoords(code: string): { x?: number; y?: number } {
   return {}
 }
 
+// Маппинг кода правила → ключ поля для fieldCoords из PaddleOCR
+function mapCodeToFieldKey(code: string): string | null {
+  const c = code.toUpperCase()
+  if (c.startsWith('R-STAMP-001') || c.startsWith('R-STAMP-002')) return 'designation'
+  if (c.startsWith('R-STAMP-003')) return 'name'
+  if (c.startsWith('R-SCALE')) return 'scale'
+  if (c.startsWith('R-MASS')) return 'mass'
+  if (c.startsWith('R-MAT')) return 'material'
+  if (c.startsWith('R-LETTER')) return 'letter'
+  if (c.startsWith('R-STAGE')) return 'stage'
+  if (c.startsWith('R-SIGN-001')) return 'developed'
+  if (c.startsWith('R-SIGN-002')) return 'checked'
+  if (c.startsWith('R-SIGN-003')) return 'normControl'
+  if (c.startsWith('R-SIGN-004')) return 'approved'
+  if (c.startsWith('R-FORMAT')) return 'format'
+  return null
+}
+
 export interface ExpectedFinding {
   code: string
   title: string
@@ -111,6 +129,7 @@ export async function runSingleSample(sample: {
   const ext = fullPath.toLowerCase().split('.').pop() || ''
 
   // 1. OCR штампа
+  let ocrFieldCoords: Record<string, { x: number; y: number }> | undefined
   if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
     try {
       const ocrResult = await extractStamp(fullPath, { useVlmFallback: true })
@@ -118,7 +137,8 @@ export async function runSingleSample(sample: {
       ocrConfidence = ocrResult.confidence
       fieldMeta = ocrResult.fieldMeta ?? null
       sourceOcr = ocrResult.sourceOcr
-      console.log(`     [OCR: ${ocrResult.method}/${sourceOcr}, ${ocrResult.durationMs}ms, confidence=${(ocrResult.confidence*100).toFixed(0)}%]`)
+      ocrFieldCoords = ocrResult.fieldCoords
+      console.log(`     [OCR: ${ocrResult.method}/${sourceOcr}, ${ocrResult.durationMs}ms, confidence=${(ocrResult.confidence*100).toFixed(0)}%${ocrFieldCoords ? ', coords=' + Object.keys(ocrFieldCoords).length : ''}]`)
     } catch (e) {
       console.error(`OCR failed for ${sample.code}:`, e)
     }
@@ -163,8 +183,17 @@ export async function runSingleSample(sample: {
   if (stamp) {
     const det = runDeterministicRules(toStampFields(stamp))
     for (const d of det) {
-      // Назначаем координаты на основе кода правила (позиция поля в штампе ГОСТ 2.104, мм)
-      const coords = getRuleCoords(d.code)
+      // Назначаем координаты: сначала из PaddleOCR bounding boxes (если есть),
+      // затем fallback на статический маппинг по ГОСТ 2.104
+      const fieldKey = mapCodeToFieldKey(d.code)
+      let coords: { x?: number; y?: number }
+      if (ocrFieldCoords && fieldKey && ocrFieldCoords[fieldKey]) {
+        // Реальные pixel-координаты от PaddleOCR
+        coords = ocrFieldCoords[fieldKey]
+      } else {
+        // Статический маппинг по ГОСТ 2.104 (мм)
+        coords = getRuleCoords(d.code)
+      }
       foundIssues.push({ ...d, sourceOcr, ...coords })
     }
 

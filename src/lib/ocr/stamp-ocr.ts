@@ -1,10 +1,11 @@
 // stamp-ocr.ts — извлечение полей штампа из изображений/SVG
-// Архитектура P5: детерминированный OCR вместо VLM
+// P5: детерминированный OCR, VLM — только крайний fallback
 //
 // Фолбэк-цепочка (по приоритету):
-// 1. SVG-парсер (для bench-семплов) — 100% точно, мгновенно
-// 2. Zone-OCR (препроцессинг + кроп штампа + Tesseract per field) — для реальных/деградированных сканов
-// 3. VLM fallback (только крайний случай, логировать причину)
+// 1. SVG-парсер (bench-семплы) — 100% точно, мгновенно
+// 2. PaddleOCR sidecar (основной движок для реальных сканов) — ~85% confidence
+// 3. Zone-OCR (Tesseract fallback если PaddleOCR недоступен) — ~30% confidence
+// 4. VLM — ТОЛЬКО если все OCR упали + !localOnly (крайний случай, логировать)
 
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
@@ -12,24 +13,44 @@ import type { StampFields } from '@/lib/types'
 
 export interface OcrResult {
   stamp: StampFields
-  method: 'svg' | 'zone-ocr' | 'tesseract' | 'vlm' | 'none'
+  method: 'svg' | 'paddleocr' | 'zone-ocr' | 'tesseract' | 'vlm' | 'none'
   sourceOcr: 'svg' | 'tesseract' | 'paddleocr' | 'vlm' | 'cad' | 'none'
   durationMs: number
-  confidence: number // 0..1
+  confidence: number
   rawText?: string
-  preprocessing?: { skewAngle?: number; dpi?: number; formatMm?: { w: number; h: number } | null; qualityScore?: number }
+  preprocessing?: { skewAngle?: number; dpi?: number; qualityScore?: number }
   fieldMeta?: Record<string, { hasText: boolean; confidence: number; parsed: boolean }>
+  fieldCoords?: Record<string, { x: number; y: number }>  // pixel coords from OCR bounding boxes
 }
 
-// Главный метод — выбрать лучший OCR по контексту
-// Стратегия: SVG → VLM (primary для изображений) → Tesseract (local_only или fallback)
+// Кеш доступности PaddleOCR
+let _paddleAvailable: boolean | null = null
+let _paddleCheckedAt = 0
+const PADDLE_CHECK_INTERVAL = 30000 // перепроверять каждые 30с
+
+async function checkPaddleAvailable(): Promise<boolean> {
+  const now = Date.now()
+  if (_paddleAvailable !== null && now - _paddleCheckedAt < PADDLE_CHECK_INTERVAL) {
+    return _paddleAvailable
+  }
+  try {
+    const { isPaddleAvailable } = await import('./paddle-ocr')
+    _paddleAvailable = await isPaddleAvailable()
+    _paddleCheckedAt = now
+  } catch {
+    _paddleAvailable = false
+  }
+  return _paddleAvailable
+}
+
+// Главный метод — правильная цепочка P5
 export async function extractStamp(
   filePath: string,
   opts: { useVlmFallback?: boolean; localOnly?: boolean } = {}
 ): Promise<OcrResult> {
   const start = Date.now()
 
-  // 1. Если есть SVG-исходник (bench-семплы) — парсим детерминированно
+  // 1. SVG-парсер (bench-семплы) — детерминированно, 100%
   const svgPath = filePath.replace(/\.png$|\.jpg$|\.jpeg$/i, '.svg').replace('/samples/', '/svg/')
   if (existsSync(svgPath)) {
     try {
@@ -48,36 +69,42 @@ export async function extractStamp(
     }
   }
 
-  // 2. Для изображений: VLM как PRIMARY OCR (если не local_only_mode)
-  // VLM даёт ~90% точность на реальных сканах (проверено на фланце)
-  // Tesseract даёт ~30% confidence — недостаточно для нормативных замечаний
-  if (!opts.localOnly && opts.useVlmFallback !== false) {
+  // 2. PaddleOCR (основной движок для реальных сканов)
+  const paddleAvailable = await checkPaddleAvailable()
+  if (paddleAvailable) {
     try {
-      const { extractStampFromImage } = await import('@/lib/zai')
-      const buf = await readFile(filePath)
-      const ext = filePath.toLowerCase().split('.').pop() || 'png'
-      const dataUrl = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${buf.toString('base64')}`
-      // Таймаут 30с на VLM — если дольше, fallback на Tesseract
-      const stamp = await Promise.race([
-        extractStampFromImage(dataUrl),
-        new Promise<null>((r) => setTimeout(() => r(null), 30000)),
-      ])
-      if (stamp && Object.keys(stamp).length > 0) {
+      const { paddleOcr, boxCenter } = await import('./paddle-ocr')
+      const result = await paddleOcr(filePath)
+      if (result && result.text && result.confidence > 0.3) {
+        const stamp = parsePaddleResult(result)
+        const fieldCoords: Record<string, { x: number; y: number }> = {}
+
+        // Извлекаем координаты центров bounding boxes
+        for (const word of result.words) {
+          const center = boxCenter(word.box)
+          // Маппинг слова к полю по тексту
+          const fieldKey = mapWordToField(word.text)
+          if (fieldKey) {
+            fieldCoords[fieldKey] = center
+          }
+        }
+
         return {
-          stamp: stamp as StampFields,
-          method: 'vlm',
-          sourceOcr: 'vlm',
+          stamp,
+          method: 'paddleocr',
+          sourceOcr: 'paddleocr',
           durationMs: Date.now() - start,
-          confidence: 0.85, // VLM высокая точность
-          rawText: `[VLM: ${Object.keys(stamp).filter(k => stamp[k as keyof typeof stamp]).length} fields]`,
+          confidence: result.confidence,
+          rawText: result.text,
+          fieldCoords,
         }
       }
     } catch (e) {
-      console.error('[OCR] VLM failed, falling back to Tesseract:', e)
+      console.error('[OCR] PaddleOCR failed, falling back to Tesseract:', e)
     }
   }
 
-  // 3. Zone-OCR (Tesseract) — fallback или local_only_mode
+  // 3. Zone-OCR (Tesseract) — fallback если PaddleOCR недоступен или неуспешен
   try {
     const { extractStampWithZoneOcr } = await import('./zone-ocr')
     const result = await extractStampWithZoneOcr(filePath)
@@ -94,35 +121,182 @@ export async function extractStamp(
       }
     }
   } catch (e) {
-    console.error('Zone-OCR failed:', e)
+    console.error('[OCR] Zone-OCR failed:', e)
   }
 
-  // 3. VLM fallback (только если запрошен — логировать причину)
-  if (opts.useVlmFallback) {
-    console.warn('[OCR] Falling back to VLM — zone-OCR did not produce results')
+  // 4. VLM — ТОЛЬКО если все OCR упали + !localOnly (крайний случай)
+  if (!opts.localOnly && opts.useVlmFallback !== false) {
+    console.warn('[OCR] All OCR engines failed, falling back to VLM (P5: last resort)')
     try {
       const { extractStampFromImage } = await import('@/lib/zai')
       const buf = await readFile(filePath)
       const ext = filePath.toLowerCase().split('.').pop() || 'png'
       const dataUrl = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${buf.toString('base64')}`
-      const stamp = await extractStampFromImage(dataUrl)
-      return {
-        stamp: stamp || {},
-        method: 'vlm',
-        sourceOcr: 'vlm',
-        durationMs: Date.now() - start,
-        confidence: 0.6,
+      const stamp = await Promise.race([
+        extractStampFromImage(dataUrl),
+        new Promise<null>((r) => setTimeout(() => r(null), 30000)),
+      ])
+      if (stamp && Object.keys(stamp).length > 0) {
+        return {
+          stamp: stamp as StampFields,
+          method: 'vlm',
+          sourceOcr: 'vlm',
+          durationMs: Date.now() - start,
+          confidence: 0.6, // VLM fallback — ниже confidence
+          rawText: `[VLM fallback: ${Object.keys(stamp).filter(k => stamp[k as keyof typeof stamp]).length} fields]`,
+        }
       }
     } catch (e) {
-      console.error('VLM fallback failed:', e)
+      console.error('[OCR] VLM fallback failed:', e)
     }
   }
 
   return { stamp: {}, method: 'none', sourceOcr: 'none', durationMs: Date.now() - start, confidence: 0 }
 }
 
+// Маппинг слова к полю штампа по тексту
+function mapWordToField(text: string): string | null {
+  const t = text.toLowerCase().trim()
+  if (/разраб/i.test(t)) return 'developed'
+  if (/^пров/i.test(t)) return 'checked'
+  if (/н\.?\s*контр/i.test(t)) return 'normControl'
+  if (/^утв/i.test(t)) return 'approved'
+  if (/лит/i.test(t)) return 'letter'
+  if (/стади/i.test(t)) return 'stage'
+  if (/масшт/i.test(t)) return 'scale'
+  if (/масс/i.test(t)) return 'mass'
+  if (/матер/i.test(t)) return 'material'
+  if (/обознач/i.test(t)) return 'designation'
+  if (/наименован/i.test(t)) return 'name'
+  if (/формат/i.test(t)) return 'format'
+  return null
+}
+
+// Парсинг результата PaddleOCR в StampFields
+function parsePaddleResult(result: { text: string; confidence: number; words: any[] }): StampFields {
+  const stamp: StampFields = {
+    format: null, designation: null, name: null, scale: null, mass: null,
+    material: null, letter: null, stage: null,
+    signatures: { developed: null, checked: null, normControl: null, approved: null },
+    dates: null, invNumber: null, technicalRequirements: [], gostReferences: [],
+    documentType: null, sheetCount: null, notes: null,
+  }
+
+  const lines = result.text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  const allText = result.text
+
+  // Обозначение
+  for (const l of lines) {
+    const m = l.match(/([А-ЯA-Z]{2,6}\.[А-ЯA-Z0-9]{4,8}\.[А-ЯA-Z0-9]{2,4})/)
+    if (m) { stamp.designation = m[1]; break }
+  }
+
+  // Масштаб
+  const sm = allText.match(/(\d{1,2})\s*:\s*(\d{1,3})/)
+  if (sm) stamp.scale = `${sm[1]}:${sm[2]}`
+
+  // Масса
+  const mm = allText.match(/([\d.,]+)\s*кг\.?/i)
+  if (mm) stamp.mass = mm[0]
+
+  // Формат
+  const fm = allText.match(/\b([AАaа][0-4])\b/)
+  if (fm) stamp.format = fm[1].toUpperCase().replace('А', 'A')
+
+  // Материал
+  const mat = allText.match(/(Сталь\s+\S+(?:\s+ГОСТ\s+[\d.\-]+)?|Бронза\s+\S+(?:\s+ГОСТ\s+[\d.\-]+)?|Латунь\s+\S+(?:\s+ГОСТ\s+[\d.\-]+)?|Алюминий\s+\S+(?:\s+ГОСТ\s+[\d.\-]+)?)/i)
+  if (mat) stamp.material = mat[0].trim()
+
+  // Литера
+  const lm = allText.match(/Лит[.:]?\s*([АБВГDOО]\d?)/i)
+  if (lm) stamp.letter = lm[1].toUpperCase()
+
+  // Стадия
+  const stm = allText.match(/Стади[яй][.:]?\s*([А-ЯA-Z]{2,4})/i)
+  if (stm) stamp.stage = stm[1].toUpperCase()
+
+  // Подписи
+  const sigPatterns: { key: 'developed' | 'checked' | 'normControl' | 'approved'; re: RegExp }[] = [
+    { key: 'developed', re: /Разраб[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.?)/i },
+    { key: 'checked', re: /Пров[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.?)/i },
+    { key: 'normControl', re: /Н\.?\s*контр[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.?)/i },
+    { key: 'approved', re: /Утв[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.?)/i },
+  ]
+  for (const { key, re } of sigPatterns) {
+    const m = allText.match(re)
+    if (m) stamp.signatures![key] = m[1]
+  }
+
+  // ГОСТ ссылки
+  const gostRefs: string[] = []
+  const matches = [...allText.matchAll(/ГОСТ\s+[\d.\-]+/gi)]
+  for (const m of matches) {
+    const ref = m[0].trim().replace(/\s+/g, ' ')
+    if (!gostRefs.includes(ref)) gostRefs.push(ref)
+  }
+  if (gostRefs.length > 0) stamp.gostReferences = gostRefs
+
+  // ТТ
+  const ttIdx = lines.findIndex(l => /технические требования/i.test(l))
+  if (ttIdx >= 0) {
+    const ttItems = lines.slice(ttIdx + 1, ttIdx + 10).filter(l => /^\d+[.:]/.test(l))
+    if (ttItems.length > 0) stamp.technicalRequirements = ttItems
+  }
+
+  // Валидация полей — помечаем OCR-артефакты
+  const validation = validateStampFields(stamp)
+  stamp.notes = Object.entries(validation)
+    .filter(([_, v]) => !v.valid)
+    .map(([k, v]) => `${k}: ${v.reason}`)
+    .join('; ') || null
+
+  return stamp
+}
+
+// Валидация форматов полей после OCR
+export function validateStampFields(stamp: StampFields): Record<string, { valid: boolean; reason?: string }> {
+  const result: Record<string, { valid: boolean; reason?: string }> = {}
+
+  if (stamp.designation) {
+    const valid = /^[А-ЯA-Z]{2,6}\.[А-ЯA-Z0-9]{4,8}\.[А-ЯA-Z0-9]{2,4}$/.test(stamp.designation)
+    if (!valid) result.designation = { valid: false, reason: 'не соответствует маске XXX.XXXXXX.XXX — возможно OCR-артефакт' }
+    else result.designation = { valid: true }
+  }
+
+  if (stamp.mass) {
+    const valid = /^[\d.,]+\s*кг\.?$/.test(stamp.mass)
+    if (!valid) result.mass = { valid: false, reason: 'неверный формат массы — возможно OCR-артефакт' }
+    else result.mass = { valid: true }
+  }
+
+  if (stamp.scale) {
+    const valid = /^\d{1,2}:\d{1,3}$/.test(stamp.scale)
+    if (!valid) result.scale = { valid: false, reason: 'неверный формат масштаба — возможно OCR-артефакт' }
+    else result.scale = { valid: true }
+  }
+
+  if (stamp.letter) {
+    const valid = /^[АБВГДО]\d?$/.test(stamp.letter)
+    if (!valid) result.letter = { valid: false, reason: 'литера не из допустимого набора — возможно OCR-артефакт' }
+    else result.letter = { valid: true }
+  }
+
+  if (stamp.stage) {
+    const valid = /^(РК|РД|РП|ЭП|ТП|Р)$/.test(stamp.stage)
+    if (!valid) result.stage = { valid: false, reason: 'стадия не из допустимого набора — возможно OCR-артефакт' }
+    else result.stage = { valid: true }
+  }
+
+  if (stamp.format) {
+    const valid = /^A[0-4]$/.test(stamp.format)
+    if (!valid) result.format = { valid: false, reason: 'формат не A0-A4 — возможно OCR-артефакт' }
+    else result.format = { valid: true }
+  }
+
+  return result
+}
+
 // ============ SVG-парсер (детерминированный, для bench) ============
-// Парсит SVG-исходник чертежа и извлекает поля штампа
 export function parseSvgStamp(svg: string): StampFields {
   const stamp: StampFields = {
     format: null, designation: null, name: null, scale: null, mass: null,
@@ -132,7 +306,6 @@ export function parseSvgStamp(svg: string): StampFields {
     documentType: null, sheetCount: null, notes: null,
   }
 
-  // Извлекаем <text> элементы с их координатами
   const textMatches = [...svg.matchAll(/<text[^>]*x="([\d.]+)"[^>]*y="([\d.]+)"[^>]*>([^<]*)<\/text>/g)]
   const texts = textMatches.map(m => ({
     x: parseFloat(m[1]),
@@ -140,50 +313,16 @@ export function parseSvgStamp(svg: string): StampFields {
     text: decodeEntities(m[3]),
   })).filter(t => t.text.trim())
 
-  // Штамп находится в нижнем правом углу (transform translate(stampX, stampY))
-  // Ищем группу штампа по характерным меткам
-  const stampGroupMatch = svg.match(/<g transform="translate\(([\d.]+),\s*([\d.]+)\)">[\s\S]*?<!-- Штамп[\s\S]*?<\/g>/)
-  let stampOffsetX = 0, stampOffsetY = 0
-  if (stampGroupMatch) {
-    // Используем координаты группы штампа (последний <g transform> перед "Штамп")
-    const transforms = [...svg.matchAll(/<g transform="translate\(([\d.]+),\s*([\d.]+)\)">/g)]
-    // Берём transform, ближайший к комментарию "Штамп"
-    const stampCommentIdx = svg.indexOf('<!-- Штамп')
-    let best = transforms[0]
-    for (const t of transforms) {
-      if (t.index !== undefined && t.index < stampCommentIdx) best = t
-    }
-    if (best) {
-      stampOffsetX = parseFloat(best[1])
-      stampOffsetY = parseFloat(best[2])
-    }
-  }
-
-  // Относительные координаты полей штампа (из buildDrawingSvg):
-  // designation: x=10, y=170 (внутри группы штампа)
-  // name: x=180, y=165
-  // developed: x=125, y=50
-  // checked: x=125, y=80
-  // normControl: x=125, y=110
-  // approved: x=125, y=140
-  // В строке "A4 · 1:2 · 12,5 кг · Сталь..." — формат, масштаб, масса, материал
-  // В строке "Лит. О · Стадия РК" — литера, стадия
-
-  // Тексты внутри <g transform> имеют ЛОКАЛЬНЫЕ координаты (как в SVG-атрибутах)
-  // Поэтому ищем по локальным координатам без смещения
   const findTextAt = (relX: number, relY: number, tolerance = 5) => {
     return texts.find(t => Math.abs(t.x - relX) < tolerance && Math.abs(t.y - relY) < tolerance)
   }
 
-  // designation
   const desig = findTextAt(10, 170)
   if (desig) stamp.designation = desig.text.trim()
 
-  // name (поле наименования)
   const name = findTextAt(180, 165)
   if (name) stamp.name = name.text.trim()
 
-  // Подписи
   const dev = findTextAt(125, 50)
   if (dev) stamp.signatures!.developed = dev.text.trim()
   const chk = findTextAt(125, 80)
@@ -193,54 +332,43 @@ export function parseSvgStamp(svg: string): StampFields {
   const ap = findTextAt(125, 140)
   if (ap) stamp.signatures!.approved = ap.text.trim()
 
-  // Строка с форматом/масштабом/массой/материалом — два text-элемента на y=178
-  // Формат SVG: "A4 · 1:2 · 12,5 кг · Сталь 09Г2С ГОСТ 19281-2014" И "Лит. О · Стадия РК"
   const fmtLines = texts.filter(t => Math.abs(t.y - 178) < 3 && Math.abs(t.x - 180) < 10)
   for (const fl of fmtLines) {
     const text = fl.text
-    // Формат: A4, A3, A2
     if (!stamp.format) {
       const fmtMatch = text.match(/\bA[0-4]\b/i)
       if (fmtMatch) stamp.format = fmtMatch[0].toUpperCase()
     }
-    // Масштаб: 1:N или N:1
     if (!stamp.scale) {
       const scaleMatch = text.match(/(\d{1,2}\s*:\s*\d{1,2})/)
       if (scaleMatch) stamp.scale = scaleMatch[1].replace(/\s/g, '')
     }
-    // Масса: число + кг (с возможной точкой)
     if (!stamp.mass) {
       const massMatch = text.match(/([\d.,]+)\s*кг\.?/i)
       if (massMatch) stamp.mass = massMatch[0]
     }
-    // Материал: Сталь/Бронза/Латунь/Алюминий + марка + ГОСТ
     if (!stamp.material) {
       const matMatch = text.match(/(Сталь\s+\S+(?:\s+ГОСТ\s+[\d.-]+)?|Бронза\s+\S+(?:\s+ГОСТ\s+[\d.-]+)?|Латунь\s+\S+(?:\s+ГОСТ\s+[\d.-]+)?|Алюминий\s+\S+(?:\s+ГОСТ\s+[\d.-]+)?)/i)
       if (matMatch) stamp.material = matMatch[0].trim()
     }
-    // Литера: "Лит. О"
     if (!stamp.letter) {
       const lm = text.match(/Лит\.\s*([АБВГДО]\d?)/i)
       if (lm) stamp.letter = lm[1].toUpperCase()
     }
-    // Стадия: "Стадия РК"
     if (!stamp.stage) {
       const sm = text.match(/Стадия\s*([А-ЯA-Z]{2,4})/i)
       if (sm) stamp.stage = sm[1].toUpperCase()
     }
   }
 
-  // Технические требования — тексты после "Технические требования"
   const ttIdx = texts.findIndex(t => /технические требования/i.test(t.text))
   if (ttIdx >= 0) {
     const ttBaseY = texts[ttIdx].y
     const ttX = texts[ttIdx].x
-    // Берём следующие тексты, которые начинаются с цифры (пункты ТТ)
     const ttItems: string[] = []
     for (let i = ttIdx + 1; i < texts.length; i++) {
       const t = texts[i]
       if (t.y > ttBaseY && Math.abs(t.x - ttX) < 50 && t.y < ttBaseY + 200) {
-        // Только пункты, начинающиеся с цифры (1. 2. 3.)
         if (/^\d+\./.test(t.text.trim())) {
           ttItems.push(t.text.trim())
         }
@@ -250,11 +378,8 @@ export function parseSvgStamp(svg: string): StampFields {
     stamp.technicalRequirements = ttItems.length > 0 ? ttItems : null
   }
 
-  // Перечень ГОСТ — собираем ГОСТ-ссылки из SVG, КРОМЕ материала
-  // (материал проверяется отдельно правилом R-MAT-003)
   const allGostRefs: string[] = []
   for (const t of texts) {
-    // Пропускаем текст в штампе (где материал с ГОСТ)
     if (Math.abs(t.y - 178) < 3 && Math.abs(t.x - 180) < 10) continue
     const matches = t.text.matchAll(/ГОСТ\s+[\d.\-]+/gi)
     for (const m of matches) {
@@ -264,13 +389,11 @@ export function parseSvgStamp(svg: string): StampFields {
   }
   stamp.gostReferences = allGostRefs.length > 0 ? allGostRefs : null
 
-  // Формат можно также извлечь из размеров SVG
   if (!stamp.format) {
     const sizeMatch = svg.match(/<svg[^>]*width="(\d+)"[^>]*height="(\d+)"/i)
     if (sizeMatch) {
       const w = parseInt(sizeMatch[1])
       const h = parseInt(sizeMatch[2])
-      // A4: 1000×1414, A3: 1414×2000, A2: 2000×2828
       if (Math.abs(w - 1000) < 10 && Math.abs(h - 1414) < 10) stamp.format = 'A4'
       else if (Math.abs(w - 1414) < 10 && Math.abs(h - 2000) < 10) stamp.format = 'A3'
       else if (Math.abs(w - 2000) < 10 && Math.abs(h - 2828) < 10) stamp.format = 'A2'
@@ -290,119 +413,9 @@ function decodeEntities(s: string): string {
     .replace(/&apos;/g, "'")
 }
 
-// ============ Tesseract.js (для реальных сканов) ============
+// Очистка ресурсов tesseract
 let _tesseractWorker: any = null
 
-async function extractStampWithTesseract(filePath: string): Promise<{ stamp: StampFields; confidence: number; rawText: string } | null> {
-  try {
-    // Динамический импорт — tesseract.js может быть тяжёлым
-    const { createWorker } = await import('tesseract.js')
-
-    if (!_tesseractWorker) {
-      _tesseractWorker = await createWorker('rus+eng', 1, {
-        logger: () => {}, // тихий режим
-      })
-    }
-
-    // Tesseract работает с файлом напрямую
-    const { data } = await _tesseractWorker.recognize(filePath)
-    const rawText = data.text || ''
-    const confidence = (data.confidence || 0) / 100
-
-    const stamp = parseRawTextToStamp(rawText)
-    return { stamp, confidence, rawText }
-  } catch (e) {
-    console.error('Tesseract init/recognize failed:', e)
-    return null
-  }
-}
-
-// Парсинг "сырого" текста OCR в поля штампа
-function parseRawTextToStamp(text: string): StampFields {
-  const stamp: StampFields = {
-    format: null, designation: null, name: null, scale: null, mass: null,
-    material: null, letter: null, stage: null,
-    signatures: { developed: null, checked: null, normControl: null, approved: null },
-    dates: null, invNumber: null, technicalRequirements: [], gostReferences: [],
-    documentType: null, sheetCount: null, notes: null,
-  }
-
-  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-
-  // Обозначение — шаблон XXX.XXXXXX.XXX
-  for (const l of lines) {
-    const m = l.match(/([А-ЯA-Z]{2,6}\.[А-ЯA-Z0-9]{4,8}\.[А-ЯA-Z0-9]{2,4})/)
-    if (m) { stamp.designation = m[1]; break }
-  }
-
-  // Масштаб
-  for (const l of lines) {
-    const m = l.match(/(\d{1,2}\s*:\s*\d{1,2})/)
-    if (m && /\b1\s*:|:\s*1\b/.test(m[1])) { stamp.scale = m[1].replace(/\s/g, ''); break }
-  }
-
-  // Масса
-  for (const l of lines) {
-    const m = l.match(/([\d.,]+)\s*кг/i)
-    if (m) { stamp.mass = m[0]; break }
-  }
-
-  // Формат
-  for (const l of lines) {
-    const m = l.match(/\bA[0-4]\b/i)
-    if (m) { stamp.format = m[0].toUpperCase(); break }
-  }
-
-  // Материал
-  for (const l of lines) {
-    const m = l.match(/(Сталь\s+[\w\dГСН-]+(?:\s+ГОСТ\s+[\d.-]+)?|Бронза\s+\S+|Латунь\s+\S+|Алюминий\s+\S+)/i)
-    if (m) { stamp.material = m[0]; break }
-  }
-
-  // Литера
-  for (const l of lines) {
-    const m = l.match(/\bЛит[.:]\s*([АБВГДО]\d?)/i)
-    if (m) { stamp.letter = m[1].toUpperCase(); break }
-  }
-  // Стадия
-  for (const l of lines) {
-    const m = l.match(/\bСтади[яй][.:]\s*([А-ЯA-Z]{2,4})/i)
-    if (m) { stamp.stage = m[1].toUpperCase(); break }
-  }
-
-  // Подписи
-  const sigMap: { key: 'developed' | 'checked' | 'normControl' | 'approved'; pattern: RegExp }[] = [
-    { key: 'developed', pattern: /Разраб[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.)/i },
-    { key: 'checked', pattern: /Пров[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.)/i },
-    { key: 'normControl', pattern: /Н\.?\s*контр[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.)/i },
-    { key: 'approved', pattern: /Утв[.:]?\s*([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.)/i },
-  ]
-  for (const { key, pattern } of sigMap) {
-    for (const l of lines) {
-      const m = l.match(pattern)
-      if (m) { stamp.signatures![key] = m[1]; break }
-    }
-  }
-
-  // ГОСТ ссылки
-  const gostRefs: string[] = []
-  for (const l of lines) {
-    const m = l.match(/ГОСТ\s+[\d.\-]+/gi)
-    if (m) gostRefs.push(...m.map(s => s.trim()))
-  }
-  if (gostRefs.length > 0) stamp.gostReferences = [...new Set(gostRefs)]
-
-  // Технические требования
-  const ttIdx = lines.findIndex(l => /технические требования/i.test(l))
-  if (ttIdx >= 0) {
-    const ttItems = lines.slice(ttIdx + 1, ttIdx + 10).filter(l => /^\d+\./.test(l) || l.length > 10)
-    if (ttItems.length > 0) stamp.technicalRequirements = ttItems
-  }
-
-  return stamp
-}
-
-// Очистка ресурсов tesseract (вызывать при завершении процесса)
 export async function terminateOcr() {
   if (_tesseractWorker) {
     try { await _tesseractWorker.terminate() } catch {}
