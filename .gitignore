@@ -52,3 +52,13 @@ prompt
 server.log
 # Skills directory
 /skills/
+
+# Runtime data
+/uploads/
+/db/*.db
+/db/*.db-journal
+/tool-results/
+/screenshots/
+/agent-ctx/
+nohup.out
+/tmp/
