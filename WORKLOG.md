@@ -285,3 +285,38 @@ VLM вызывается ТОЛЬКО если:
 VLM (glm-4.5v) не распознаёт мелкий текст в нижней строке штампа (масштаб/масса/материал/литера/стадия) на деградированных сканах. Это ограничение VLM, не архитектуры.
 Решение в production: PaddleOCR (PP-OCRv5) с 8GB+ RAM — даёт ~85% confidence и bounding boxes.
 В sandbox: ограничение 4GB RAM не позволяет запустить PaddleOCR inference.
+
+---
+## Финальный отчёт — Блоки 1-5
+
+| Час | Блок | Статус | Метрики бенчей | Решения | Следующее |
+|---|---|---|---|---|---|
+| 0-2 | Б1: OCR PaddleOCR | PaddleOCR OOM в sandbox | Синт: GREEN 100/100; DXF: GREEN 20/20; Realistic: R=60% P=6% | Downscale 1000px, lightweight models, VLM last-resort при conf<0.4 | Б2-3 |
+| 2-3 | Б2: Правила 320→460 | ✅ 140 новых | Без изменений | Параметризованные правила со ссылками на справочники | Б3 |
+| 3-4 | Б3: Справочники | ✅ 4403 записей | Без изменений | 8 моделей Prisma, параметрическая генерация | Б4 |
+| 4-5 | Б4: Feedback loop | ✅ API готов | Без изменений | KnowledgeSuggestion модель, approve endpoint | Б5 |
+| 5-6 | Б5: LLM семантика | ✅ Промпт расширен | Без изменений | 4 категории проверок, evidence field, P6/P7 compliance | Финал |
+
+### Итоговые объёмы базы знаний
+- **Стандартов**: 573
+- **Правил**: 460 (320 + 140 новых параметризованных)
+- **Справочников**: 4403 записи (8 таблиц: Material, Fastener, Bearing, RolledProduct, WeldingMaterial, Coating, PipeFitting, ShipEquipment)
+- **Bench семплов**: 180 (100 synthetic + 20 DXF + 60 realistic)
+
+### Бенчи
+| Tier | Samples | Recall | Precision | Pass | Статус |
+|---|---|---|---|---|---|
+| Synthetic | 100 | 100% | 100% | 100/100 | 🟢 GREEN |
+| DXF | 20 | 100% | 100% | 20/20 | 🟢 GREEN |
+| Realistic | 10 | 60% | 6% | 0/10 | 🔴 RED |
+
+### Что блокирует Realistic GREEN
+PaddleOCR PP-OCRv5 требует ~1.5GB RAM на inference. Sandbox: 4GB total, ~800MB free. Решение: Docker с 8GB+ RAM в production.
+
+### Архитектура v1.1
+- OCR: SVG → PaddleOCR (primary, OOM в sandbox) → Tesseract (31% conf) → VLM (85% conf, last-resort)
+- validateStampFields: маска обозначения, regex массы, whitelist масштабов/литер/стадий
+- Post-filter: confidence-aware, VLM trusted при conf>=0.8
+- Feedback: отклонённый FP → KnowledgeSuggestion → approve → bench sample
+- LLM: 4 категории семантических проверок с evidence, все source=llm, статус=гипотеза
+- Справочники: 4403 записей, правила ссылаются через params.refTable
