@@ -14,10 +14,16 @@ _ocr = None
 def get_ocr():
     global _ocr
     if _ocr is None:
-        logger.info("Initializing PaddleOCR (PP-OCRv5, ru)...")
+        logger.info("Initializing PaddleOCR (PP-OCRv5, ru, lightweight)...")
         from paddleocr import PaddleOCR
-        _ocr = PaddleOCR(use_textline_orientation=True, lang='ru')
-        logger.info("PaddleOCR ready")
+        # PP-OCRv5 — отключаем тяжёлые модели doc orientation и unwarping
+        _ocr = PaddleOCR(
+            use_textline_orientation=True,
+            lang='ru',
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+        )
+        logger.info("PaddleOCR ready (lightweight)")
     return _ocr
 
 class OcrRequest(BaseModel):

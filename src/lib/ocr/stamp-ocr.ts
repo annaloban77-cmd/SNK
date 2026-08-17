@@ -105,11 +105,12 @@ export async function extractStamp(
   }
 
   // 3. Zone-OCR (Tesseract) — fallback если PaddleOCR недоступен или неуспешен
+  let tessResult: OcrResult | null = null
   try {
     const { extractStampWithZoneOcr } = await import('./zone-ocr')
     const result = await extractStampWithZoneOcr(filePath)
     if (result.stamp && Object.keys(result.stamp).length > 0) {
-      return {
+      tessResult = {
         stamp: result.stamp,
         method: 'zone-ocr',
         sourceOcr: result.sourceOcr || 'tesseract',
@@ -119,14 +120,19 @@ export async function extractStamp(
         preprocessing: result.preprocessing as any,
         fieldMeta: result.fieldMeta,
       }
+      // Если confidence >= 0.4 — возвращаем результат Tesseract
+      if (tessResult.confidence >= 0.4) {
+        return tessResult
+      }
+      // Если confidence < 0.4 — пробуем VLM (если разрешён), иначе возвращаем Tesseract
     }
   } catch (e) {
     console.error('[OCR] Zone-OCR failed:', e)
   }
 
-  // 4. VLM — ТОЛЬКО если все OCR упали + !localOnly (крайний случай)
+  // 4. VLM — last-resort: вызывается если Tesseract confidence < 0.4 + !localOnly
   if (!opts.localOnly && opts.useVlmFallback !== false) {
-    console.warn('[OCR] All OCR engines failed, falling back to VLM (P5: last resort)')
+    console.warn('[OCR] OCR confidence low, falling back to VLM (P5: last resort)')
     try {
       const { extractStampFromImage } = await import('@/lib/zai')
       const buf = await readFile(filePath)
@@ -137,19 +143,32 @@ export async function extractStamp(
         new Promise<null>((r) => setTimeout(() => r(null), 30000)),
       ])
       if (stamp && Object.keys(stamp).length > 0) {
+        // Валидация полей после VLM — отбрасываем OCR-артефакты
+        const validation = validateStampFields(stamp as StampFields)
+        const cleanedStamp = { ...stamp } as StampFields
+        // Если поле невалидно — обнуляем его (не генерируем нормативное замечание)
+        for (const [key, v] of Object.entries(validation)) {
+          if (!v.valid && (cleanedStamp as any)[key]) {
+            console.warn(`[OCR] VLM artifact: ${key} = "${(cleanedStamp as any)[key]}" — ${v.reason}`)
+            delete (cleanedStamp as any)[key]
+          }
+        }
         return {
-          stamp: stamp as StampFields,
+          stamp: cleanedStamp,
           method: 'vlm',
           sourceOcr: 'vlm',
           durationMs: Date.now() - start,
-          confidence: 0.6, // VLM fallback — ниже confidence
-          rawText: `[VLM fallback: ${Object.keys(stamp).filter(k => stamp[k as keyof typeof stamp]).length} fields]`,
+          confidence: 0.85,
+          rawText: `[VLM: ${Object.keys(cleanedStamp).filter(k => (cleanedStamp as any)[k]).length} fields]`,
         }
       }
     } catch (e) {
       console.error('[OCR] VLM fallback failed:', e)
     }
   }
+
+  // 5. Возвращаем результат Tesseract (даже если low confidence)
+  if (tessResult) return tessResult
 
   return { stamp: {}, method: 'none', sourceOcr: 'none', durationMs: Date.now() - start, confidence: 0 }
 }
