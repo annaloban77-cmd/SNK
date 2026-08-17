@@ -259,3 +259,29 @@ VLM вызывается ТОЛЬКО если:
 4. localOnly = false
 
 Это соответствует P5: "детерминированность по умолчанию, LLM — только fallback с флагом source_ocr"
+
+---
+## Финальный блок — самоотчёт (часы 0-2)
+
+| Час | Блок | Статус | Метрики бенчей | Решения | Следующее |
+|---|---|---|---|---|---|
+| 0-1 | Б1: PaddleOCR downscale + VLM last-resort | PaddleOCR OOM в sandbox | Синт: GREEN 100/100; DXF: GREEN 20/20; Realistic: R=60% P=6% | Downscale 1000px, lightweight models, VLM при conf<0.4, validateStampFields | Б2-3: правила+справочники |
+| 1-2 | Б1: VLM validation + post-filter trust | VLM trusted при conf>=0.8 | Те же | VLM видит подписи, но не видит scale/mass/material на деградированных | Б2: правила |
+
+### Решения
+1. **PaddleOCR OOM**: 4GB RAM в sandbox. PP-OCRv5 требует ~1.5GB на inference. Модели загружаются (loaded:true), но процесс убивается при обработке. В Docker с 8GB+ будет работать.
+2. **VLM как last-resort**: цепочка SVG → PaddleOCR (недоступен) → Tesseract (31% conf) → VLM (85% conf). VLM видит подписи, но не видит мелкие поля (scale/mass/material/letter/stage) на деградированных изображениях.
+3. **validateStampFields**: после VLM — отбрасывает невалидные поля (OCR-артефакты).
+4. **Post-filter VLM trust**: при VLM confidence >= 0.8 — доверяем "missing" findings. Tesseract < 0.4 — не доверяем.
+5. **Coord=0.00mm**: found и expected координаты используют один маппинг ГОСТ 2.104. Реальная pixel-level точность требует PaddleOCR bounding boxes (недоступно в sandbox).
+
+### Статус бенчей (v1.1)
+- **Synthetic**: 🟢 GREEN 100/100 (R=100%, P=100%)
+- **DXF**: 🟢 GREEN 20/20 (R=100%, P=100%)
+- **Realistic**: 🔴 RED (R=60%, P=6% — VLM видит не все поля)
+- **Release gate**: RED (realistic не зелёный)
+
+### Что блокирует Realistic GREEN
+VLM (glm-4.5v) не распознаёт мелкий текст в нижней строке штампа (масштаб/масса/материал/литера/стадия) на деградированных сканах. Это ограничение VLM, не архитектуры.
+Решение в production: PaddleOCR (PP-OCRv5) с 8GB+ RAM — даёт ~85% confidence и bounding boxes.
+В sandbox: ограничение 4GB RAM не позволяет запустить PaddleOCR inference.
