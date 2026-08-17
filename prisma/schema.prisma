@@ -191,6 +191,8 @@ model Organization {
   apiKeys       ApiKey[]
   auditLogs     AuditLog[]
   documents     Document[]
+  benchSamples  BenchSample[]
+  benchRuns     BenchRun[]
 }
 
 // Пользователь системы
@@ -278,9 +280,10 @@ model Subscription {
 // Эталонный/контрольный документ для стенда
 model BenchSample {
   id              String   @id @default(cuid())
-  code            String   @unique // "S-001", "E-042"
+  code            String   @unique // "S-001", "E-042", "R-001", "D-001", "X-001"
   title           String   // описание семпла
   category        String   // тип: "correct" | "with_errors"
+  tier             String   @default("synthetic") // synthetic | realistic | torture | real | dxf
   documentType    String   // "drawing" | "assembly" | "specification" | "welding" | "circuit" | "cad"
   format          String   // A4 | A3 | A2 | A1 | A0
   sourceType      String   // "scan" | "pdf" | "dwg" | "dxf" | "cdw" | "sldprt" | "sldasm" | "slddrw" | "spw"
@@ -290,48 +293,52 @@ model BenchSample {
   expectedHigh    Int      @default(0)
   expectedMedium  Int      @default(0)
   expectedLow     Int      @default(0)
-  // Категории ожидаемых ошибок (для аналитики)
   expectedCategories String? // JSON: ["stamp","material","welding",...]
   description     String?
   isActive        Boolean  @default(true)
+  organizationId  String?  // P3: свой бенч на организацию
+  organization    Organization? @relation(fields: [organizationId], references: [id])
   createdAt       DateTime @default(now())
   findings        BenchFinding[]
 
   @@index([category])
+  @@index([tier])
   @@index([documentType])
   @@index([isActive])
+  @@index([organizationId])
 }
 
-// Один прогон стенда (запуск всех активных семплов)
+// Один прогон стенда (запуск семплов по tier)
 model BenchRun {
   id              String   @id @default(cuid())
-  version         String   // версия ядра/правил (например "0.2.1")
+  version         String   // версия ядра/правил
+  tier             String   @default("all") // synthetic | realistic | torture | real | dxf | all
   status          String   @default("running") // running | completed | failed | aborted
   startedAt       DateTime @default(now())
   finishedAt      DateTime?
   durationMs      Int?
-  // Метрики агрегированные
+  organizationId  String?  // P3: стенд привязан к бюро
+  organization    Organization? @relation(fields: [organizationId], references: [id])
   totalSamples    Int      @default(0)
-  passedSamples   Int      @default(0) // семплы где Recall>=90% Precision>=85%
+  passedSamples   Int      @default(0)
   failedSamples   Int      @default(0)
-  // Recall/Precision по всему прогону
-  recall          Float?   // 0..1, доля ожидаемых ошибок найденных
-  precision       Float?   // 0..1, доля найденных соответствующих ожиданиям
-  recallHigh      Float?   // Recall только по высококритичным
-  coordAccuracy   Float?   // среднее отклонение в мм (меньше = лучше)
-  // Статус «зелёный/жёлтый/красный»
+  recall          Float?   // 0..1
+  precision       Float?   // 0..1
+  recallHigh      Float?   // 0..1
+  coordAccuracy   Float?   // среднее отклонение в мм (меньше = лучше), null если нет координат
   benchStatus     String?  // "green" | "yellow" | "red"
-  // Сводка
   totalExpected   Int      @default(0)
   totalFound      Int      @default(0)
-  totalMatched    Int      @default(0) // истинные срабатывания
-  totalFalsePos   Int      @default(0) // ложные срабатывания
-  totalFalseNeg   Int      @default(0) // пропущенные
+  totalMatched    Int      @default(0)
+  totalFalsePos   Int      @default(0)
+  totalFalseNeg   Int      @default(0)
   notes           String?
   findings        BenchFinding[]
 
   @@index([status])
+  @@index([tier])
   @@index([startedAt])
+  @@index([organizationId])
 }
 
 // Результат проверки одного семпла в рамках прогона
@@ -339,23 +346,20 @@ model BenchFinding {
   id              String   @id @default(cuid())
   runId           String
   sampleId        String
-  // Что нашла система
-  foundCode       String?  // код правила
+  foundCode       String?
   foundTitle      String?
-  foundSeverity   String?  // high | medium | low
+  foundSeverity   String?
   foundField      String?
-  // Ожидаемая ошибка (если matched)
+  foundX          Float?   // координата X найденной ошибки (мм)
+  foundY          Float?   // координата Y найденной ошибки (мм)
+  sourceOcr       String?  // "svg" | "tesseract" | "paddle" | "vlm" | "cad" — какой движок нашёл
   expectedCode    String?
   expectedTitle   String?
   expectedSeverity String?
-  // Соответствие
-  status          String   // "matched" | "false_positive" | "false_negative" | "expected_only"
-  // Координаты (для проверки координатной точности)
-  expectedX       Float?
-  expectedY       Float?
-  foundX          Float?
-  foundY          Float?
-  coordDelta      Float?   // расстояние в мм (если применимо)
+  expectedX       Float?   // координата X ожидаемой ошибки (мм)
+  expectedY       Float?   // координата Y ожидаемой ошибки (мм)
+  status          String   // "matched" | "false_positive" | "false_negative"
+  coordDelta      Float?   // расстояние между found и expected в мм
   createdAt       DateTime @default(now())
   run             BenchRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
   sample          BenchSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
@@ -363,5 +367,6 @@ model BenchFinding {
   @@index([runId])
   @@index([sampleId])
   @@index([status])
+  @@index([sourceOcr])
 }
 
