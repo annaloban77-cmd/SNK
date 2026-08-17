@@ -59,7 +59,7 @@ export async function runSingleSample(sample: {
   // 1. OCR штампа (детерминированный: SVG-парсер для bench, Tesseract для реальных)
   if (['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)) {
     try {
-      const ocrResult = await extractStamp(fullPath, { useVlmFallback: false })
+      const ocrResult = await extractStamp(fullPath, { useVlmFallback: true })
       stamp = ocrResult.stamp
       ocrConfidence = ocrResult.confidence
       fieldMeta = ocrResult.fieldMeta ?? null
