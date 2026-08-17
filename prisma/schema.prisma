@@ -149,6 +149,7 @@ model Issue {
   updatedAt    DateTime @updatedAt
   document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   rule         Rule?    @relation(fields: [ruleId], references: [id])
+  suggestions  KnowledgeSuggestion[]
 
   @@index([documentId])
   @@index([severity])
@@ -193,6 +194,7 @@ model Organization {
   documents     Document[]
   benchSamples  BenchSample[]
   benchRuns     BenchRun[]
+  suggestions   KnowledgeSuggestion[]
 }
 
 // Пользователь системы
@@ -464,5 +466,29 @@ model ShipEquipment {
   createdAt DateTime @default(now())
   @@index([type])
   @@index([gost])
+}
+
+// ============ FEEDBACK LOOP (Блок 4) ============
+
+model KnowledgeSuggestion {
+  id          String   @id @default(cuid())
+  type        String   // "bench_sample" | "new_rule" | "reference_entry"
+  status      String   @default("new") // new | approved | rejected
+  title       String
+  description String?
+  // Для bench_sample: предзаполненный expected JSON
+  payload     String?  // JSON: { code, category, expectedFindings, filePath }
+  // Связь с источником
+  issueId     String?  // связанный Issue (FP или FN)
+  issue       Issue?   @relation(fields: [issueId], references: [id])
+  // Связь с организацией
+  organizationId String?
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([organizationId])
 }
 
