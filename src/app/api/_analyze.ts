@@ -50,8 +50,9 @@ export async function detectFormatFromImage(
       // Wide landscape — A3/A2 landscape; default to A3 (most common in shipbuilding)
       return 'A3'
     }
-    // 0.75 ≤ ratio ≤ 1.4 — could be anything square-ish; can't reliably detect
-    return 'unknown'
+    // 0.75 ≤ ratio ≤ 1.4 — could be A3/A2 portrait or A4 landscape
+    // Default to A3 (most common in shipbuilding)
+    return 'A3'
   } catch {
     return null
   }

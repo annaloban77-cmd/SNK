@@ -310,30 +310,46 @@ function ApiKeyRow({
         </Badge>
       </TableCell>
       <TableCell className="pr-6 text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8">
-              <MoreVertical className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={onRevoke}
-              disabled={revoked || isExpired}
-            >
-              <Ban className="mr-2 size-3.5 text-amber-500" />
-              Отозвать
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={onDelete}
-              className="text-red-600 focus:text-red-700"
-            >
-              <Trash2 className="mr-2 size-3.5" />
-              Удалить
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={() => {
+              navigator.clipboard.writeText(masked)
+              toast.success('Ключ скопирован')
+            }}
+            title="Копировать префикс ключа"
+          >
+            <Copy className="size-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8"
+            onClick={onRevoke}
+            disabled={revoked || isExpired}
+            title="Отозвать ключ"
+          >
+            <Ban className="size-3.5 text-amber-500" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-8">
+                <MoreVertical className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={onDelete}
+                className="text-red-600 focus:text-red-700"
+              >
+                <Trash2 className="mr-2 size-3.5" />
+                Удалить
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </TableCell>
     </TableRow>
   )
@@ -663,13 +679,14 @@ function DeleteConfirmDialog({
 
 function ApiDocsCard() {
   const [copied, setCopied] = React.useState<string | null>(null)
+  const host = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:1111'
 
   const examples = [
     {
       id: 'list',
       title: 'Получить список стандартов',
       cmd: `curl -H "Authorization: Bearer nk-your-key-here" \\
-  https://your-domain.ru/api/v1/standards`,
+  ${host}/api/v1/standards`,
     },
     {
       id: 'analyze',
@@ -677,13 +694,13 @@ function ApiDocsCard() {
       cmd: `curl -X POST -H "Authorization: Bearer nk-your-key-here" \\
   -H "Content-Type: application/json" \\
   -d '{"runLlm":true}' \\
-  https://your-domain.ru/api/v1/documents/{id}/analyze`,
+  ${host}/api/v1/documents/{id}/analyze`,
     },
     {
       id: 'get-doc',
       title: 'Получить документ по ID',
       cmd: `curl -H "Authorization: Bearer nk-your-key-here" \\
-  https://your-domain.ru/api/v1/documents/{id}`,
+  ${host}/api/v1/documents/{id}`,
     },
   ]
 
