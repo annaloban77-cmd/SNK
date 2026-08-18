@@ -113,8 +113,10 @@ export function Bench() {
           <CardContent className="p-4 flex items-center gap-3">
             <div className="size-3 rounded-full bg-amber-500 animate-pulse" />
             <div className="text-sm">
-              <span className="font-medium">Тест {running.version}</span> выполняется...
-              <span className="text-muted-foreground ml-2">начат {format(new Date(running.startedAt), 'HH:mm:ss', { locale: ru })}</span>
+              <span className="font-medium">Идёт тестирование...</span>
+              <span className="text-muted-foreground ml-2">
+                {format(new Date(running.startedAt), 'dd.MM.yyyy HH:mm', { locale: ru })}
+              </span>
             </div>
           </CardContent>
         </Card>

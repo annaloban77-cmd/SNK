@@ -132,7 +132,7 @@ export function Documents() {
   const analyze = useAnalyzeDocument()
 
   const [uploadOpen, setUploadOpen] = React.useState(false)
-  const [samplesOpen, setSamplesOpen] = React.useState(false)
+  
 
   function setField<K extends keyof DocumentFilters>(k: K, v: DocumentFilters[K]) {
     setFilters((f) => ({ ...f, [k]: v, page: 1 }))
@@ -154,14 +154,6 @@ export function Documents() {
               <RefreshCw className={isFetching ? 'size-4 animate-spin' : 'size-4'} />
               Обновить
             </Button>
-            <SamplesDropdown
-              open={samplesOpen}
-              onOpenChange={setSamplesOpen}
-              onSampleAnalyzed={(docId) => {
-                store.selectDocument(docId)
-                store.setView('document-detail')
-              }}
-            />
             <Button size="sm" onClick={() => setUploadOpen(true)}>
               <Upload className="size-4" />
               Загрузить
