@@ -13,6 +13,8 @@ import {
   useDocumentIssues,
   useCheckLog,
   useAnalyzeDocument,
+  useRetryDocument,
+  useOrganization,
   downloadReport,
   type CheckLogEntry,
 } from '@/hooks/use-nk-api'
@@ -33,6 +35,7 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  RotateCcw,
 } from 'lucide-react'
 import {
   formatDateTime,
@@ -49,6 +52,17 @@ export function DocumentDetail() {
 
   const { data: doc, isLoading, isError, refetch } = useDocument(docId)
   const analyze = useAnalyzeDocument()
+  const retry = useRetryDocument()
+  const logQ = useCheckLog(docId)
+
+  // Last failed CheckLog entry — used for the "error" card
+  const failedEntry = React.useMemo(() => {
+    const items = logQ.data?.items ?? []
+    // Prefer the most recent failed stage; fallback to watchdog message
+    return (
+      items.slice().reverse().find((e) => e.status === 'failed') ?? null
+    )
+  }, [logQ.data])
 
   if (!docId) {
     return (
@@ -142,6 +156,18 @@ export function DocumentDetail() {
         }
       />
 
+      {/* Failed state card */}
+      {doc?.status === 'failed' ? (
+        <FailedCard
+          entry={failedEntry}
+          retrying={retry.isPending || analyze.isPending}
+          onRetry={async () => {
+            await retry.mutateAsync({ id: docId })
+            await analyze.mutateAsync({ id: docId, runLlm: true })
+          }}
+        />
+      ) : null}
+
       {analyze.isPending ? (
         <Card>
           <CardContent className="space-y-3 p-4">
@@ -179,6 +205,62 @@ export function DocumentDetail() {
 
       <DocumentTabs docId={docId} />
     </div>
+  )
+}
+
+function FailedCard({
+  entry,
+  retrying,
+  onRetry,
+}: {
+  entry: CheckLogEntry | null
+  retrying: boolean
+  onRetry: () => void
+}) {
+  const message =
+    entry?.message ||
+    'Проверка завершилась с ошибкой. Подробности доступны в журнале проверок.'
+  const stage = entry?.stage || '—'
+  return (
+    <Card className="border-red-200 bg-red-50/40 dark:border-red-900/60 dark:bg-red-950/20">
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700 ring-1 ring-red-200 dark:bg-red-950/60 dark:text-red-300 dark:ring-red-900">
+            <AlertTriangle className="size-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-red-800 dark:text-red-200">
+              Проверка не завершена
+            </div>
+            <div className="mt-0.5 text-xs text-red-700/80 dark:text-red-200/80">
+              Этап:{' '}
+              <span className="font-mono">{stage}</span>
+              {entry?.durationMs != null
+                ? ` · ${formatDuration(entry.durationMs)}`
+                : ''}
+              {entry?.createdAt
+                ? ` · ${formatDateTime(entry.createdAt)}`
+                : ''}
+            </div>
+            <p className="mt-1 text-sm text-foreground/90">{message}</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={retrying}
+          onClick={onRetry}
+          className="bg-red-100 text-red-800 hover:bg-red-200 hover:text-red-900 dark:bg-red-950/60 dark:text-red-200 dark:hover:bg-red-900/60"
+        >
+          {retrying ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RotateCcw className="size-4" />
+          )}
+          Повторить проверку
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -393,6 +475,18 @@ function DocumentTabs({ docId }: { docId: string }) {
   const issuesQ = useDocumentIssues(docId)
   const logQ = useCheckLog(docId)
   const { data: doc } = useDocument(docId)
+  const orgQ = useOrganization()
+
+  // "Сырые данные" tab is admin-only: visible when organization plan is 'pro'/'enterprise'
+  // or when the URL has ?admin=true (for development/debug).
+  const showRawTab = React.useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      if (sp.get('admin') === 'true') return true
+    }
+    const plan = orgQ.data?.plan
+    return plan === 'enterprise' || plan === 'pro'
+  }, [orgQ.data?.plan])
 
   return (
     <Tabs defaultValue="issues">
@@ -406,7 +500,7 @@ function DocumentTabs({ docId }: { docId: string }) {
           ) : null}
         </TabsTrigger>
         <TabsTrigger value="log">Журнал проверок</TabsTrigger>
-        <TabsTrigger value="raw">Сырые данные</TabsTrigger>
+        {showRawTab ? <TabsTrigger value="raw">Сырые данные</TabsTrigger> : null}
       </TabsList>
 
       <TabsContent value="issues" className="space-y-3">
@@ -435,21 +529,23 @@ function DocumentTabs({ docId }: { docId: string }) {
         <CheckLogTimeline items={logQ.data?.items ?? []} loading={logQ.isLoading} />
       </TabsContent>
 
-      <TabsContent value="raw">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Сырой JSON штампа</CardTitle>
-            <CardDescription>
-              Полный объект, распознанный VLM-моделью
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/30 p-4 text-xs">
-              {JSON.stringify(doc?.stamp ?? null, null, 2)}
-            </pre>
-          </CardContent>
-        </Card>
-      </TabsContent>
+      {showRawTab ? (
+        <TabsContent value="raw">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Сырой JSON штампа</CardTitle>
+              <CardDescription>
+                Полный объект, распознанный VLM-моделью (только для администраторов)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <pre className="max-h-[60vh] overflow-auto rounded-md border bg-muted/30 p-4 text-xs">
+                {JSON.stringify(doc?.stamp ?? null, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      ) : null}
     </Tabs>
   )
 }

@@ -284,6 +284,30 @@ export function useProjects() {
   })
 }
 
+export interface CreateProjectPayload {
+  code: string
+  name: string
+  description?: string
+  stage: string
+}
+
+export function useCreateProject() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: CreateProjectPayload) => {
+      return apiFetch<ProjectItem>('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify(vars),
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      toast.success('Проект создан')
+    },
+    onError: (e: Error) => toast.error('Ошибка создания: ' + e.message),
+  })
+}
+
 export function useCheckLog(documentId: string | null) {
   return useQuery<{ items: CheckLogEntry[] }>({
     queryKey: ['checklog', documentId],
@@ -431,6 +455,27 @@ export function useUploadDocument() {
   })
 }
 
+export function useRetryDocument() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: { id: string }) => {
+      return apiFetch<DocumentDto>(`/api/documents/${vars.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'retry' }),
+      })
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['document', vars.id] })
+      qc.invalidateQueries({ queryKey: ['documents'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['document-issues', vars.id] })
+      qc.invalidateQueries({ queryKey: ['checklog', vars.id] })
+      toast.success('Документ сброшен, можно повторить проверку')
+    },
+    onError: (e: Error) => toast.error('Ошибка сброса: ' + e.message),
+  })
+}
+
 export function useAnalyzeDocument() {
   const qc = useQueryClient()
   return useMutation({
@@ -523,6 +568,35 @@ export function useUpdateRule() {
       toast.success('Правило обновлено')
     },
     onError: (e: Error) => toast.error('Ошибка: ' + e.message),
+  })
+}
+
+export interface CreateRulePayload {
+  code: string
+  name: string
+  description: string
+  category: string
+  method: string
+  severity: string
+  gostField?: string
+  expression?: string
+  standardId?: string
+}
+
+export function useCreateRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (vars: CreateRulePayload) => {
+      return apiFetch<RuleDto>(`/api/rules`, {
+        method: 'POST',
+        body: JSON.stringify(vars),
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['rules'] })
+      toast.success('Правило создано')
+    },
+    onError: (e: Error) => toast.error('Ошибка создания: ' + e.message),
   })
 }
 
@@ -627,6 +701,7 @@ export function useCreateApiKey() {
     mutationFn: async (vars: {
       name: string
       scopes: string
+      expiresAt?: string
     }) => {
       return apiFetch<ApiKeyWithSecret>('/api/organization/api-keys', {
         method: 'POST',

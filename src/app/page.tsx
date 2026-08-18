@@ -88,6 +88,11 @@ export default function Home() {
 
   const [uploadOpen, setUploadOpen] = React.useState(false)
 
+  // Role-based UI: 'free' plan → viewer (read-only, no admin features)
+  //                    'pro' / 'enterprise' → admin (full feature set)
+  const plan = orgQ.data?.plan
+  const isAdmin = plan === 'pro' || plan === 'enterprise'
+
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Дашборд', icon: <LayoutDashboard className="size-4" /> },
     {
@@ -122,10 +127,16 @@ export default function Home() {
     { id: 'rules', label: 'Правила', icon: <ListChecks className="size-4" /> },
     { id: 'projects', label: 'Проекты', icon: <FolderKanban className="size-4" /> },
     { id: 'settings', label: 'Настройки', icon: <Settings className="size-4" /> },
-    { id: 'apikeys', label: 'API-ключи', icon: <KeyRound className="size-4" /> },
-    { id: 'audit', label: 'Аудит', icon: <History className="size-4" /> },
-    { id: 'bench', label: 'Стенд', icon: <FlaskConical className="size-4" /> },
   ]
+  // Admin-only items (visible on pro / enterprise plan)
+  const adminNav: NavItem[] = isAdmin
+    ? [
+        { id: 'apikeys', label: 'API-ключи', icon: <KeyRound className="size-4" /> },
+        { id: 'audit', label: 'Аудит', icon: <History className="size-4" /> },
+        { id: 'bench', label: 'Стенд', icon: <FlaskConical className="size-4" /> },
+      ]
+    : []
+  const allNavItems: NavItem[] = [...navItems, ...adminNav]
 
   function handleNav(v: NKView) {
     if (v !== 'document-detail') selectDocument(null)
@@ -164,7 +175,7 @@ export default function Home() {
 
   const navList = (
     <nav className="flex flex-col gap-1 p-3">
-      {navItems.map((item) => {
+      {allNavItems.map((item) => {
         const active = view === item.id
         return (
           <button
@@ -284,7 +295,9 @@ export default function Home() {
               <div className="mt-auto border-t p-3 text-[10px] text-muted-foreground">
                 <div className="font-medium">ЕСКД · СПДС · Регистр РФ</div>
                 <div className="mt-0.5">
-                  Документов в системе: {dash ? dash.totalDocuments : '…'}
+                  Документов: {dash ? dash.totalDocuments : '…'}
+                  {' · '} Справочников: {dash?.referenceCount ?? '…'}
+                  {' · '} v{dash?.dbVersion ?? '…'}
                 </div>
                 {orgQ.data ? (
                   <div className="mt-0.5">
@@ -302,7 +315,7 @@ export default function Home() {
       {/* Footer (sticky) */}
       <footer className="mt-auto border-t bg-card/40">
         <div className="flex flex-col items-center justify-between gap-2 px-4 py-3 text-xs text-muted-foreground sm:flex-row md:px-6">
-          <div>© 2025 Северо-Верфь · НК-Контроль v0.1</div>
+          <div>© 2026 Северо-Верфь · НК-Контроль v1.1</div>
           <div className="hidden items-center gap-3 sm:flex">
             <span className="rounded border px-1.5 py-0.5">ЕСКД</span>
             <span className="rounded border px-1.5 py-0.5">СПДС</span>
@@ -311,7 +324,10 @@ export default function Home() {
           <div>
             База знаний: {standardsCount != null ? standardsCount : '…'} стандартов
             {' · '}
-            {rulesCount != null ? rulesCount : '…'} правил активны
+            {rulesCount != null ? rulesCount : '…'} правил
+            {' · '}
+            {dash?.referenceCount ?? '…'} справочников
+            {' · '} v{dash?.dbVersion ?? '…'}
           </div>
         </div>
       </footer>

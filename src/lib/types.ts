@@ -94,7 +94,7 @@ export interface IssueDto {
   createdAt: string
   updatedAt: string
   document?: { id: string; name: string; format: string } | null
-  rule?: { id: string; code: string; name: string } | null
+  rule?: { id: string; code: string; name: string; standardId: string | null } | null | undefined
 }
 
 export interface RuleDto {

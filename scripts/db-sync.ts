@@ -40,8 +40,16 @@ async function main() {
   const { importBenchSamples } = await import('../src/lib/bench')
   await importBenchSamples()
 
-  // 5. Демо-данные организации
-  console.log('\n🏢 5. Организация (демо)...')
+  // 5. StandardClause (пункты ГОСТ) — scripts/seed-clauses.ts
+  console.log('\n📜 5. Ключевые пункты стандартов (StandardClause)...')
+  await import('../scripts/seed-clauses')
+
+  // 6. Связывание Rule.standardId ↔ Standard.code — scripts/db-link.ts
+  console.log('\n🔗 6. Связывание правил со стандартами (db-link)...')
+  await import('../scripts/db-link')
+
+  // 7. Демо-данные организации
+  console.log('\n🏢 7. Организация (демо)...')
   const orgCount = await db.organization.count()
   if (orgCount === 0) {
     await db.organization.create({
@@ -66,6 +74,8 @@ async function main() {
   // Финальный подсчёт
   const standards = await db.standard.count()
   const rules = await db.rule.count()
+  const linkedRules = await db.rule.count({ where: { NOT: { standardId: null } } })
+  const clauses = await db.standardClause.count()
   const materials = await db.material.count()
   const fasteners = await db.fastener.count()
   const bearings = await db.bearing.count()
@@ -81,7 +91,8 @@ async function main() {
   console.log(`✅ Синхронизация завершена!`)
   console.log(`\n📊 Итоговые объёмы базы знаний:`)
   console.log(`   Стандартов:     ${standards}`)
-  console.log(`   Правил:         ${rules}`)
+  console.log(`   Правил:         ${rules} (связано со стандартами: ${linkedRules})`)
+  console.log(`   Пунктов ГОСТ:   ${clauses}`)
   console.log(`   Справочников:   ${refTotal}`)
   console.log(`     • Материалы:      ${materials}`)
   console.log(`     • Крепёж:          ${fasteners}`)
@@ -105,3 +116,4 @@ async function main() {
 main()
   .catch(e => { console.error('❌ db:sync failed:', e); process.exit(1) })
   .finally(async () => { await db.$disconnect() })
+

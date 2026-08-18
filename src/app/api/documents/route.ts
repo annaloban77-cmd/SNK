@@ -4,6 +4,38 @@ import { mapDocument } from '../_map'
 
 export const dynamic = 'force-dynamic'
 
+const WATCHDOG_TIMEOUT_MS = 5 * 60 * 1000 // 5 минут
+
+/**
+ * Watchdog: документы со статусом 'processing', которые не обновлялись более 5 минут,
+ * помечаются как 'failed' с записью в CheckLog.
+ * Запускается при каждом запросе списка документов (cheap query).
+ */
+async function runWatchdog() {
+  try {
+    const cutoff = new Date(Date.now() - WATCHDOG_TIMEOUT_MS)
+    const stuck = await db.document.findMany({
+      where: { status: 'processing', updatedAt: { lt: cutoff } },
+      select: { id: true },
+    })
+    if (stuck.length === 0) return
+    await db.document.updateMany({
+      where: { id: { in: stuck.map((s) => s.id) } },
+      data: { status: 'failed' },
+    })
+    await db.checkLog.createMany({
+      data: stuck.map((s) => ({
+        documentId: s.id,
+        stage: 'watchdog',
+        status: 'failed',
+        message: 'Превышено время ожидания (5 мин)',
+      })),
+    })
+  } catch (e) {
+    console.error('watchdog failed:', e)
+  }
+}
+
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const status = sp.get('status') || undefined
@@ -14,11 +46,19 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(sp.get('page') || '1', 10))
   const pageSize = Math.max(1, Math.min(100, parseInt(sp.get('pageSize') || '20', 10)))
 
+  // Watchdog: detects stuck 'processing' documents and marks them as 'failed'
+  await runWatchdog()
+
   const where: Record<string, unknown> = {}
   if (status) where.status = status
   if (format) where.format = format
   if (sourceType) where.sourceType = sourceType
-  if (projectId) where.projectId = projectId
+  // projectId=none — special value meaning "documents without a project"
+  if (projectId === 'none') {
+    where.projectId = null
+  } else if (projectId) {
+    where.projectId = projectId
+  }
 
   // For search we need to also look inside stampJson.designation. SQLite JSON_EXTRACT is supported
   // by Prisma's `queryRaw`, but for simplicity we fetch filtered docs and apply search in JS.

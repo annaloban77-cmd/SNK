@@ -43,6 +43,7 @@ import {
   ListChecks,
   Library,
 } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDashboard, useStandardsStats } from '@/hooks/use-nk-api'
 import { StatCard } from './nk-stat-card'
 import { PageHeader } from './nk-page-header'
@@ -121,9 +122,26 @@ export function Dashboard() {
           tone="emerald"
           loading={isLoading}
           hint={
-            stats
-              ? `Процент успешности: ${stats.passRate}%`
-              : undefined
+            stats ? (
+              <span className="inline-flex items-center gap-1">
+                Без замечаний:{' '}
+                <span className="font-semibold tabular-nums">{stats.passRate}%</span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground/60 hover:text-foreground"
+                      aria-label="Что значит «Без замечаний»?"
+                    >
+                      <AlertTriangle className="size-3" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Доля документов, прошедших проверку без замечаний высокой критичности
+                  </TooltipContent>
+                </Tooltip>
+              </span>
+            ) : undefined
           }
         />
         <StatCard
@@ -191,15 +209,15 @@ export function Dashboard() {
               icon={<ListChecks className="size-4" />}
             />
             <KBStat
-              label="Категорий"
-              value={categoriesCount}
-              loading={statsQ.isLoading && !stats?.categoriesCount}
+              label="Справочников"
+              value={stats?.referenceCount ?? 0}
+              loading={isLoading && stats?.referenceCount === undefined}
               icon={<Library className="size-4" />}
             />
             <KBStat
-              label="Действующих"
-              value={statsQ.data?.activeCount ?? 0}
-              loading={statsQ.isLoading}
+              label={`Версия БД: v${stats?.dbVersion ?? '?'}`}
+              value={categoriesCount}
+              loading={statsQ.isLoading && !stats?.categoriesCount}
               icon={<CheckCircle2 className="size-4" />}
             />
           </div>
@@ -430,8 +448,13 @@ export function Dashboard() {
               (stats?.topIssues ?? []).map((t) => (
                 <div
                   key={t.code}
-                  className="flex items-start justify-between gap-3 rounded-md border p-3"
+                  className="flex items-center gap-3 rounded-md border p-3"
                 >
+                  <div className="flex w-10 shrink-0 items-center justify-center">
+                    <span className="text-xl font-bold leading-none tabular-nums">
+                      {t.count}
+                    </span>
+                  </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <SeverityBadge severity={t.severity} />
@@ -439,15 +462,7 @@ export function Dashboard() {
                         {t.code}
                       </Badge>
                     </div>
-                    <div className="mt-1 line-clamp-2 text-sm">{t.title}</div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-xl font-bold tabular-nums">
-                      {t.count}
-                    </span>
-                    <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground">
-                      <TrendingUp className="size-3" /> раз
-                    </span>
+                    <div className="mt-1 line-clamp-1 text-sm">{t.title}</div>
                   </div>
                 </div>
               ))

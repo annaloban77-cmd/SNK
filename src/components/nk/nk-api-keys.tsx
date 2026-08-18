@@ -45,6 +45,13 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   KeyRound,
   Plus,
   RefreshCw,
@@ -107,6 +114,15 @@ export function ApiKeys() {
   const [revokeTarget, setRevokeTarget] = React.useState<ApiKeyDto | null>(null)
   const [deleteTarget, setDeleteTarget] = React.useState<ApiKeyDto | null>(null)
 
+  // Filter out test/CI keys from the main display — they clutter the table
+  // without providing user value. Match "test", "CI/CD", "demo" (case-insensitive).
+  const visibleKeys = React.useMemo(() => {
+    return (data?.items ?? []).filter((k) => {
+      const name = k.name.toLowerCase()
+      return !name.includes('test') && !name.includes('ci/cd') && !name.includes('demo')
+    })
+  }, [data?.items])
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -139,7 +155,7 @@ export function ApiKeys() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
             <KeyRound className="size-4" />
-            Ключи доступа ({data?.items.length ?? 0})
+            Ключи доступа ({visibleKeys.length})
           </CardTitle>
           <CardDescription>
             Активные и отозванные ключи вашей организации
@@ -159,7 +175,7 @@ export function ApiKeys() {
                 <Skeleton key={i} className="h-14 w-full" />
               ))}
             </div>
-          ) : (data?.items ?? []).length === 0 ? (
+          ) : visibleKeys.length === 0 ? (
             <div className="px-6">
               <EmptyState
                 icon={<KeyRound className="size-6" />}
@@ -187,7 +203,7 @@ export function ApiKeys() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(data?.items ?? []).map((k) => (
+                  {visibleKeys.map((k) => (
                     <ApiKeyRow
                       key={k.id}
                       apiKey={k}
@@ -244,8 +260,21 @@ function ApiKeyRow({
   const masked = maskKey(apiKey.keyPrefix)
   const scopes = apiKey.scopes.split(',').filter(Boolean)
   const revoked = apiKey.status === 'revoked'
+
+  // Auto-expire: if expiresAt is in the past and key is still 'active',
+  // show as expired (status text is computed client-side for UX)
+  const now = Date.now()
+  const isExpired =
+    apiKey.status === 'expired' ||
+    (apiKey.expiresAt != null && new Date(apiKey.expiresAt).getTime() < now)
+  const displayStatus = isExpired
+    ? 'expired'
+    : revoked
+    ? 'revoked'
+    : apiKey.status
+
   return (
-    <TableRow className={revoked ? 'opacity-60' : ''}>
+    <TableRow className={displayStatus !== 'active' ? 'opacity-60' : ''}>
       <TableCell className="pl-6">
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-medium">{apiKey.name}</span>
@@ -276,8 +305,8 @@ function ApiKeyRow({
         {apiKey.expiresAt ? formatDateTime(apiKey.expiresAt) : '∞'}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className={KEY_STATUS_BADGE[apiKey.status]}>
-          {KEY_STATUS_LABEL[apiKey.status] ?? apiKey.status}
+        <Badge variant="outline" className={KEY_STATUS_BADGE[displayStatus]}>
+          {KEY_STATUS_LABEL[displayStatus] ?? displayStatus}
         </Badge>
       </TableCell>
       <TableCell className="pr-6 text-right">
@@ -290,7 +319,7 @@ function ApiKeyRow({
           <DropdownMenuContent align="end">
             <DropdownMenuItem
               onClick={onRevoke}
-              disabled={revoked}
+              disabled={revoked || isExpired}
             >
               <Ban className="mr-2 size-3.5 text-amber-500" />
               Отозвать
@@ -329,11 +358,15 @@ function CreateApiKeyDialog({
   const create = useCreateApiKey()
   const [name, setName] = React.useState('')
   const [scopes, setScopes] = React.useState<string[]>(['read'])
+  const [expiry, setExpiry] = React.useState('never')
+  const [customDate, setCustomDate] = React.useState('')
 
   React.useEffect(() => {
     if (!open) {
       setName('')
       setScopes(['read'])
+      setExpiry('never')
+      setCustomDate('')
     }
   }, [open])
 
@@ -341,6 +374,20 @@ function CreateApiKeyDialog({
     setScopes((cur) =>
       cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s]
     )
+  }
+
+  function computeExpiresAt(): string | undefined {
+    if (expiry === 'never') return undefined
+    if (expiry === 'custom') {
+      if (!customDate) return undefined
+      const d = new Date(customDate)
+      return isNaN(d.getTime()) ? undefined : d.toISOString()
+    }
+    const days = parseInt(expiry, 10)
+    if (isNaN(days)) return undefined
+    const d = new Date()
+    d.setDate(d.getDate() + days)
+    return d.toISOString()
   }
 
   return (
@@ -385,6 +432,30 @@ function CreateApiKeyDialog({
               ))}
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ak-expiry">Срок действия</Label>
+            <Select value={expiry} onValueChange={setExpiry}>
+              <SelectTrigger id="ak-expiry" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="never">Бессрочно</SelectItem>
+                <SelectItem value="7">7 дней</SelectItem>
+                <SelectItem value="30">30 дней</SelectItem>
+                <SelectItem value="90">90 дней</SelectItem>
+                <SelectItem value="365">1 год</SelectItem>
+                <SelectItem value="custom">Своя дата</SelectItem>
+              </SelectContent>
+            </Select>
+            {expiry === 'custom' ? (
+              <Input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                min={new Date().toISOString().slice(0, 10)}
+              />
+            ) : null}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -393,8 +464,9 @@ function CreateApiKeyDialog({
           <Button
             disabled={!name || scopes.length === 0 || create.isPending}
             onClick={() => {
+              const expiresAt = computeExpiresAt()
               create.mutate(
-                { name, scopes: scopes.join(',') },
+                { name, scopes: scopes.join(','), expiresAt },
                 {
                   onSuccess: (key) => {
                     onCreated(key)

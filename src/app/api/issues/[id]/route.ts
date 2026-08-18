@@ -34,7 +34,7 @@ export async function PATCH(
     data: { status: body.status },
     include: {
       document: { select: { id: true, name: true, format: true, organizationId: true } },
-      rule: { select: { id: true, code: true, name: true } },
+      rule: { select: { id: true, code: true, name: true, standardId: true } },
     },
   })
 

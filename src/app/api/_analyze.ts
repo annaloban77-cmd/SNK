@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { logAudit } from '@/lib/audit'
 import { mapIssue, parseStamp } from './_map'
 import { llmSemanticCheck, type ExtractedStamp } from '@/lib/zai'
-import { runDeterministicRules, toStampFields, fromLlmIssues, type RuleCheckResult } from '@/lib/rules'
+import { runDeterministicRules, toStampFields, fromLlmIssues, cadNoStampFinding, isStampEmpty, type RuleCheckResult } from '@/lib/rules'
 import { extractStamp } from '@/lib/ocr/stamp-ocr'
 import { analyzeGeometry } from '@/lib/geometry/geometry-checker'
 import { filterFindings } from '@/lib/post-filter'
@@ -25,6 +25,37 @@ function timeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 }
 
 const IMAGE_MIME = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+
+/**
+ * Detect paper format (A0..A4 or "unknown") from image aspect ratio.
+ * ratio = width / height
+ *   - A4 portrait:   ratio ≈ 0.71 (210/297)
+ *   - A3 portrait:   ratio ≈ 0.71 too — indistinguishable without DPI/sheet markers
+ *   - A4 landscape:  ratio ≈ 1.41 (297/210)
+ *   - A3/A2 landscape: similar landscape ratio
+ * We pick a coarse guess based on the ratio ranges defined in the task.
+ */
+export async function detectFormatFromImage(
+  filePath: string
+): Promise<string | null> {
+  try {
+    const meta = await sharp(filePath).metadata()
+    if (!meta.width || !meta.height) return null
+    const ratio = meta.width / meta.height
+    if (ratio < 0.75) {
+      // Tall portrait — A4 portrait is most common
+      return 'A4'
+    }
+    if (ratio > 1.4) {
+      // Wide landscape — A3/A2 landscape; default to A3 (most common in shipbuilding)
+      return 'A3'
+    }
+    // 0.75 ≤ ratio ≤ 1.4 — could be anything square-ish; can't reliably detect
+    return 'unknown'
+  } catch {
+    return null
+  }
+}
 
 export async function fileToImageDataUrl(filePath: string, mimeType: string): Promise<string | null> {
   if (!existsSync(filePath)) return null
@@ -143,9 +174,21 @@ export async function runAnalyzePipeline(
         await logStage(documentId, 'ocr_extract', stamp ? 'success' : 'failed', dur, msg)
         stages.push({ stage: 'ocr_extract', status: stamp ? 'success' : 'failed', durationMs: dur, message: msg })
         if (stamp) {
+          // Format detector: if OCR didn't return a format, infer from image aspect ratio
+          if (!stamp.format || String(stamp.format).trim() === '') {
+            const detected = await detectFormatFromImage(doc.filePath)
+            if (detected) {
+              ;(stamp as ExtractedStamp & { format?: string }).format = detected
+            }
+          }
           await db.document.update({
             where: { id: documentId },
-            data: { stampJson: JSON.stringify(stamp) },
+            data: {
+              stampJson: JSON.stringify(stamp),
+              ...(stamp.format && stamp.format !== 'unknown'
+                ? { format: String(stamp.format) }
+                : {}),
+            },
           })
         }
       } catch (e) {
@@ -197,7 +240,13 @@ export async function runAnalyzePipeline(
       const rulesStart = Date.now()
       try {
         const stampFields: StampFields = toStampFields(stamp)
-        deterministicResults = runDeterministicRules(stampFields)
+        // CAD-nostamp shortcut: if CAD file produced an essentially empty stamp,
+        // emit a single R-CAD-NOSTAMP finding instead of all "missing-field" findings.
+        if (isCadFile && isStampEmpty(stampFields)) {
+          deterministicResults = [cadNoStampFinding()]
+        } else {
+          deterministicResults = runDeterministicRules(stampFields)
+        }
         const dur = Date.now() - rulesStart
         await logStage(documentId, 'rules_check', 'success', dur, `${deterministicResults.length} замечаний`)
         stages.push({ stage: 'rules_check', status: 'success', durationMs: dur, message: `${deterministicResults.length} замечаний` })
@@ -319,7 +368,7 @@ export async function runAnalyzePipeline(
       orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
       include: {
         document: { select: { id: true, name: true, format: true } },
-        rule: { select: { id: true, code: true, name: true } },
+        rule: { select: { id: true, code: true, name: true, standardId: true } },
       },
     })
 

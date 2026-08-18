@@ -78,7 +78,10 @@ export const DETERMINISTIC_RULES: DeterministicRule[] = [
     field: 'Формат',
     check: (s) => {
       const f = (s.format || '').toUpperCase().trim()
-      if (!f) return mkIssue('R-FORMAT-001', 'Формат листа не распознан', 'Поле "Формат" в основной надписи не заполнено или не распознано.', 'high', 'Формат', 'Указать формат листа (A0–A4) по ГОСТ 2.301.', 'Заполнить поле "Формат"', s.format ?? '')
+      // Don't fire when format is unknown/empty — that's a separate "missing field"
+      // case handled by the format detector (the analyze pipeline populates format
+      // from image aspect ratio or CAD header where possible).
+      if (!f || f === 'UNKNOWN') return null
       if (!ALLOWED_FORMATS.includes(f)) {
         return mkIssue('R-FORMAT-001', 'Недопустимый формат листа', `Формат "${f}" не входит в перечень допустимых (A0–A4).`, 'high', 'Формат', 'Заменить формат на один из допустимых: A0, A1, A2, A3, A4.', 'ГОСТ 2.301-68', f)
       }
@@ -342,6 +345,18 @@ export const DETERMINISTIC_RULES: DeterministicRule[] = [
       return null
     },
   },
+  {
+    code: 'R-CAD-NOSTAMP',
+    title: 'Штамп не найден в CAD-файле',
+    description: 'CAD-файл не содержит атрибутов штампа. Требуется ручная проверка основной надписи.',
+    severity: 'medium',
+    gostRef: 'ГОСТ 2.104-2006',
+    field: 'CAD-штамп',
+    // Not auto-triggered by runDeterministicRules. The analyze pipeline adds
+    // this finding explicitly when a CAD file is parsed but stamp attributes
+    // are empty — replacing the entire pack of "missing-field" findings.
+    check: () => null,
+  },
 ]
 
 function mkIssue(
@@ -380,6 +395,59 @@ export function runDeterministicRules(stamp: StampFields): RuleCheckResult[] {
     }
   }
   return results
+}
+
+/**
+ * Deterministic finding returned when a CAD file is parsed but the parser
+ * couldn't find any stamp attributes (no ATTDEF block in DXF, no metadata
+ * in DWG/SLDPRT/CDW). Replaces the pack of "missing field" findings that
+ * would otherwise be generated for empty stamp fields.
+ */
+export function cadNoStampFinding(): RuleCheckResult {
+  return {
+    code: 'R-CAD-NOSTAMP',
+    title: 'Штамп не найден в CAD-файле',
+    description:
+      'CAD-файл не содержит атрибутов основной надписи (штампа). ' +
+      'Парсер не обнаружил ATTDEF-блоков в DXF или свойств документа в DWG/SolidWorks/КОМПАС. ' +
+      'Требуется ручная проверка основной надписи по ГОСТ 2.104-2006.',
+    requirement: 'ГОСТ 2.104-2006',
+    recommendation:
+      'Откройте файл в CAD-системе и проверьте, что блок основной надписи ' +
+      'заполнен и сохранён как ATTDEF-атрибуты. Либо загрузите скан/растр чертежа.',
+    gostRef: 'ГОСТ 2.104-2006',
+    field: 'CAD-штамп',
+    severity: 'medium',
+    source: 'auto',
+    evidence: 'CAD parser: stampAttributes empty',
+  }
+}
+
+/**
+ * Returns true if the stamp object is essentially empty (no useful fields).
+ * Used by the analyze pipeline to decide whether to emit R-CAD-NOSTAMP.
+ */
+export function isStampEmpty(stamp: StampFields | null | undefined): boolean {
+  if (!stamp) return true
+  const fields = [
+    stamp.format,
+    stamp.designation,
+    stamp.name,
+    stamp.scale,
+    stamp.mass,
+    stamp.material,
+    stamp.letter,
+    stamp.stage,
+    stamp.signatures?.developed,
+    stamp.signatures?.checked,
+    stamp.signatures?.normControl,
+    stamp.signatures?.approved,
+  ]
+  const meaningful = fields.filter(
+    (v) => typeof v === 'string' && v.trim().length > 0
+  )
+  // Treat as empty if no more than one field has any value
+  return meaningful.length <= 1
 }
 
 // Преобразование LLM-замечаний в унифицированный формат

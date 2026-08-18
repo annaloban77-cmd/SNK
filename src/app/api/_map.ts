@@ -95,7 +95,7 @@ type IssueWithRelations = {
   createdAt: Date
   updatedAt: Date
   document?: { id: string; name: string; format: string } | null
-  rule?: { id: string; code: string; name: string } | null
+  rule?: { id: string; code: string; name: string; standardId?: string | null } | null
 }
 
 export function mapIssue(i: IssueWithRelations): IssueDto {
@@ -119,7 +119,9 @@ export function mapIssue(i: IssueWithRelations): IssueDto {
     document: i.document
       ? { id: i.document.id, name: i.document.name, format: i.document.format }
       : null,
-    rule: i.rule ? { id: i.rule.id, code: i.rule.code, name: i.rule.name } : null,
+    rule: i.rule
+      ? { id: i.rule.id, code: i.rule.code, name: i.rule.name, standardId: i.rule.standardId ?? null }
+      : null,
   }
 }
 

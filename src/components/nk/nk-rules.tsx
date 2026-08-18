@@ -31,11 +31,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { ListChecks, RefreshCw, Eye } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Plus, ListChecks, RefreshCw, Eye, FlaskConical } from 'lucide-react'
+import { toast } from 'sonner'
 import {
   useRules,
   useUpdateRule,
+  useCreateRule,
+  useStandards,
   type RuleFilters,
+  type CreateRulePayload,
 } from '@/hooks/use-nk-api'
 import { PageHeader } from './nk-page-header'
 import { EmptyState, ErrorState } from './nk-empty-state'
@@ -58,11 +63,21 @@ const CATEGORY_OPTIONS = [
   { value: 'semantic', label: 'Семантика' },
 ]
 
+const CATEGORY_FORM_OPTIONS = CATEGORY_OPTIONS.filter((o) => o.value !== 'all')
+
 const METHOD_OPTIONS = [
   { value: 'all', label: 'Все методы' },
   { value: 'deterministic', label: 'Детерминированное' },
   { value: 'semantic', label: 'Семантическое' },
   { value: 'vision', label: 'VLM' },
+]
+
+const METHOD_FORM_OPTIONS = METHOD_OPTIONS.filter((o) => o.value !== 'all')
+
+const SEVERITY_FORM_OPTIONS = [
+  { value: 'high', label: 'Высокая' },
+  { value: 'medium', label: 'Средняя' },
+  { value: 'low', label: 'Низкая' },
 ]
 
 const ENABLED_OPTIONS = [
@@ -101,6 +116,7 @@ export function Rules() {
   const { data, isLoading, isError, refetch, isFetching } = useRules(filters)
 
   const [selectedRule, setSelectedRule] = React.useState<RuleDto | null>(null)
+  const [createOpen, setCreateOpen] = React.useState(false)
 
   function setField<K extends keyof RuleFilters>(k: K, v: RuleFilters[K]) {
     setFilters((f) => ({ ...f, [k]: v, page: 1 }))
@@ -112,12 +128,30 @@ export function Rules() {
         title="Правила"
         description="Детерминированные, семантические и VLM-правила нормоконтроля"
         actions={
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw
-              className={isFetching ? 'size-4 animate-spin' : 'size-4'}
-            />
-            Обновить
-          </Button>
+          <>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw
+                className={isFetching ? 'size-4 animate-spin' : 'size-4'}
+              />
+              Обновить
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                toast.info('Прогон по бенчу', {
+                  description: 'В разработке — скоро будет доступно',
+                })
+              }
+            >
+              <FlaskConical className="size-4" />
+              Прогнать по бенчу
+            </Button>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="size-4" />
+              Создать правило
+            </Button>
+          </>
         }
       />
 
@@ -256,6 +290,8 @@ export function Rules() {
         rule={selectedRule}
         onOpenChange={(v) => !v && setSelectedRule(null)}
       />
+
+      <CreateRuleDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   )
 }
@@ -465,6 +501,215 @@ function RuleDetailDialog({
             disabled={update.isPending}
           >
             {rule.enabled ? 'Отключить правило' : 'Включить правило'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function CreateRuleDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}) {
+  const create = useCreateRule()
+  const standardsQ = useStandards({ pageSize: 100 })
+
+  const [code, setCode] = React.useState('')
+  const [name, setName] = React.useState('')
+  const [description, setDescription] = React.useState('')
+  const [category, setCategory] = React.useState('stamp')
+  const [method, setMethod] = React.useState('deterministic')
+  const [severity, setSeverity] = React.useState<Severity>('medium')
+  const [gostField, setGostField] = React.useState('')
+  const [expression, setExpression] = React.useState('')
+  const [standardId, setStandardId] = React.useState('__none__')
+
+  React.useEffect(() => {
+    if (!open) {
+      setCode('')
+      setName('')
+      setDescription('')
+      setCategory('stamp')
+      setMethod('deterministic')
+      setSeverity('medium')
+      setGostField('')
+      setExpression('')
+      setStandardId('__none__')
+    }
+  }, [open])
+
+  function handleSubmit() {
+    const payload: CreateRulePayload = {
+      code: code.trim(),
+      name: name.trim(),
+      description: description.trim(),
+      category,
+      method,
+      severity,
+      gostField: gostField.trim() || undefined,
+      expression: expression.trim() || undefined,
+      standardId: standardId === '__none__' ? undefined : standardId,
+    }
+    create.mutate(payload, {
+      onSuccess: () => {
+        onOpenChange(false)
+      },
+    })
+  }
+
+  const canSubmit =
+    code.trim() &&
+    name.trim() &&
+    description.trim() &&
+    !create.isPending
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle>Создать правило нормоконтроля</DialogTitle>
+          <DialogDescription>
+            Новое правило будет добавлено в базу знаний и станет доступно для
+            проверок после включения.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-code">Код правила</Label>
+            <Input
+              id="rule-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="R-XXX-001"
+              className="font-mono"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-name">Название</Label>
+            <Input
+              id="rule-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Короткое название правила"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-desc">Описание</Label>
+            <Textarea
+              id="rule-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Что проверяет правило и при каких условиях срабатывает"
+              rows={3}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="rule-cat">Категория</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger id="rule-cat" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_FORM_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rule-method">Метод</Label>
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger id="rule-method" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {METHOD_FORM_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rule-sev">Критичность</Label>
+              <Select
+                value={severity}
+                onValueChange={(v) => setSeverity(v as Severity)}
+              >
+                <SelectTrigger id="rule-sev" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEVERITY_FORM_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="rule-std">ГОСТ (стандарт)</Label>
+              <Select value={standardId} onValueChange={setStandardId}>
+                <SelectTrigger id="rule-std" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Без стандарта</SelectItem>
+                  {(standardsQ.data?.items ?? []).map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="font-mono">{s.code}</span> · {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-gost">ГОСТ-поле (текстом)</Label>
+            <Input
+              id="rule-gost"
+              value={gostField}
+              onChange={(e) => setGostField(e.target.value)}
+              placeholder="Например: ГОСТ 2.104-2006"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-expr">Выражение / параметры (JSON)</Label>
+            <Textarea
+              id="rule-expr"
+              value={expression}
+              onChange={(e) => setExpression(e.target.value)}
+              placeholder={'{\n  "field": "designation",\n  "pattern": "^[A-Z0-9]+\\\\.[A-Z0-9]+$"\n}'}
+              rows={4}
+              className="font-mono text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground">
+              JSON-выражение с параметрами правила (используется детерминированным движком).
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Отмена
+          </Button>
+          <Button onClick={handleSubmit} disabled={!canSubmit}>
+            {create.isPending ? (
+              <RefreshCw className="size-4 animate-spin" />
+            ) : (
+              <Plus className="size-4" />
+            )}
+            Создать правило
           </Button>
         </DialogFooter>
       </DialogContent>

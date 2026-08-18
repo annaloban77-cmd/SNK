@@ -27,7 +27,7 @@ export async function GET(
     orderBy: [{ severity: 'asc' }, { createdAt: 'desc' }],
     include: {
       document: { select: { id: true, name: true, format: true } },
-      rule: { select: { id: true, code: true, name: true } },
+      rule: { select: { id: true, code: true, name: true, standardId: true } },
     },
   })
 

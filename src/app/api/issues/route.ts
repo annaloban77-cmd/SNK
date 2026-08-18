@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
       take: pageSize,
       include: {
         document: { select: { id: true, name: true, format: true } },
-        rule: { select: { id: true, code: true, name: true } },
+        rule: { select: { id: true, code: true, name: true, standardId: true } },
       },
     }),
   ])

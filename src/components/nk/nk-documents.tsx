@@ -48,11 +48,14 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
+  RotateCcw,
 } from 'lucide-react'
 import {
   useDocuments,
   useSamples,
   useAnalyzeSample,
+  useAnalyzeDocument,
+  useRetryDocument,
   type DocumentFilters,
 } from '@/hooks/use-nk-api'
 import { PageHeader } from './nk-page-header'
@@ -125,6 +128,8 @@ export function Documents() {
   }, [searchBox])
 
   const { data, isLoading, isError, refetch, isFetching } = useDocuments(filters)
+  const retry = useRetryDocument()
+  const analyze = useAnalyzeDocument()
 
   const [uploadOpen, setUploadOpen] = React.useState(false)
   const [samplesOpen, setSamplesOpen] = React.useState(false)
@@ -251,6 +256,28 @@ export function Documents() {
             >
               Сбросить фильтр проекта
             </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setFilters((f) => ({ ...f, projectId: 'none', page: 1 }))
+              }
+              title="Показать документы без проекта"
+            >
+              Без проекта
+            </Button>
+          )}
+          {filters.projectId === 'none' ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() =>
+                setFilters((f) => ({ ...f, projectId: undefined, page: 1 }))
+              }
+            >
+              Сбросить «Без проекта»
+            </Button>
           ) : null}
         </CardContent>
       </Card>
@@ -370,6 +397,20 @@ export function Documents() {
                             >
                               <Play className="size-4" /> Запустить проверку
                             </DropdownMenuItem>
+                            {d.status === 'failed' ? (
+                              <DropdownMenuItem
+                                onClick={async () => {
+                                  await retry.mutateAsync({ id: d.id })
+                                  await analyze.mutateAsync({
+                                    id: d.id,
+                                    runLlm: true,
+                                  })
+                                }}
+                                disabled={retry.isPending || analyze.isPending}
+                              >
+                                <RotateCcw className="size-4" /> Повторить проверку
+                              </DropdownMenuItem>
+                            ) : null}
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Скачать</DropdownMenuLabel>
                             <DropdownMenuItem
