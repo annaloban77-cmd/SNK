@@ -180,6 +180,22 @@ export async function GET() {
     standardsCount,
     rulesCount,
     categoriesCount: categoriesCount.length,
+    // Reference data counts (Block 3)
+    referenceCount: await (async () => {
+      try {
+        const [m, f, b, r, w, c, p, e] = await Promise.all([
+          db.material.count(), db.fastener.count(), db.bearing.count(),
+          db.rolledProduct.count(), db.weldingMaterial.count(), db.coating.count(),
+          db.pipeFitting.count(), db.shipEquipment.count(),
+        ])
+        return m + f + b + r + w + c + p + e
+      } catch { return 0 }
+    })(),
+    // DB version
+    dbVersion: await (async () => {
+      try { const m = await db.meta.findUnique({ where: { key: 'sync_version' } }); return m?.value || 'unknown' }
+      catch { return 'unknown' }
+    })(),
     // Business metrics (P5)
     avgCheckTimeSec: avgCheckDurationMs ? Math.round(avgCheckDurationMs / 1000 * 10) / 10 : null,
     firstTimePassRate: passRate,

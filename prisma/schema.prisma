@@ -297,13 +297,8 @@ model BenchSample {
   expectedLow     Int      @default(0)
   expectedCategories String? // JSON: ["stamp","material","welding",...]
   description     String?
-  tier             String   @default("synthetic") // synthetic | realistic | torture | real | dxf
   isActive        Boolean  @default(true)
-<<<<<<< HEAD
   organizationId  String?
-=======
-  organizationId  String?  // P3: свой бенч на организацию
->>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
   organization    Organization? @relation(fields: [organizationId], references: [id])
   createdAt       DateTime @default(now())
   findings        BenchFinding[]
@@ -340,8 +335,6 @@ model BenchRun {
   totalFalsePos   Int      @default(0)
   totalFalseNeg   Int      @default(0)
   notes           String?
-  organizationId  String?
-  organization    Organization? @relation(fields: [organizationId], references: [id])
   findings        BenchFinding[]
 
   @@index([status])
@@ -361,7 +354,6 @@ model BenchFinding {
   foundField      String?
   foundX          Float?   // координата X найденной ошибки (мм)
   foundY          Float?   // координата Y найденной ошибки (мм)
-<<<<<<< HEAD
   sourceOcr       String?  // "svg" | "tesseract" | "paddle" | "vlm" | "cad"
   // Ожидаемая ошибка (если matched)
   expectedCode    String?
@@ -370,14 +362,6 @@ model BenchFinding {
   expectedX       Float?
   expectedY       Float?
   // Соответствие
-=======
-  sourceOcr       String?  // "svg" | "tesseract" | "paddle" | "vlm" | "cad" — какой движок нашёл
-  expectedCode    String?
-  expectedTitle   String?
-  expectedSeverity String?
-  expectedX       Float?   // координата X ожидаемой ошибки (мм)
-  expectedY       Float?   // координата Y ожидаемой ошибки (мм)
->>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
   status          String   // "matched" | "false_positive" | "false_negative"
   coordDelta      Float?   // расстояние между found и expected в мм
   createdAt       DateTime @default(now())
@@ -390,9 +374,14 @@ model BenchFinding {
   @@index([sourceOcr])
 }
 
-<<<<<<< HEAD
-=======
 // ============ СПРАВОЧНИКИ (Блок 3) ============
+
+model Meta {
+  id        String   @id @default("singleton")
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
 
 model Material {
   id        String   @id @default(cuid())
@@ -488,7 +477,6 @@ model ShipEquipment {
   @@index([gost])
 }
 
->>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
 // ============ FEEDBACK LOOP (Блок 4) ============
 
 model KnowledgeSuggestion {
@@ -497,18 +485,9 @@ model KnowledgeSuggestion {
   status      String   @default("new") // new | approved | rejected
   title       String
   description String?
-<<<<<<< HEAD
   payload     String?  // JSON: { code, category, expectedFindings, filePath }
   issueId     String?
   issue       Issue?   @relation(fields: [issueId], references: [id])
-=======
-  // Для bench_sample: предзаполненный expected JSON
-  payload     String?  // JSON: { code, category, expectedFindings, filePath }
-  // Связь с источником
-  issueId     String?  // связанный Issue (FP или FN)
-  issue       Issue?   @relation(fields: [issueId], references: [id])
-  // Связь с организацией
->>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
   organizationId String?
   organization Organization? @relation(fields: [organizationId], references: [id])
   createdAt   DateTime @default(now())

@@ -158,6 +158,8 @@ export interface DashboardStats {
   standardsCount?: number
   rulesCount?: number
   categoriesCount?: number
+  referenceCount?: number
+  dbVersion?: string
   // Business metrics (P5)
   avgCheckTimeSec?: number | null
   firstTimePassRate?: number
