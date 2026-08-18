@@ -149,6 +149,7 @@ model Issue {
   updatedAt    DateTime @updatedAt
   document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   rule         Rule?    @relation(fields: [ruleId], references: [id])
+  suggestions  KnowledgeSuggestion[]
 
   @@index([documentId])
   @@index([severity])
@@ -191,6 +192,9 @@ model Organization {
   apiKeys       ApiKey[]
   auditLogs     AuditLog[]
   documents     Document[]
+  benchSamples  BenchSample[]
+  benchRuns     BenchRun[]
+  suggestions   KnowledgeSuggestion[]
 }
 
 // Пользователь системы
@@ -293,13 +297,18 @@ model BenchSample {
   // Категории ожидаемых ошибок (для аналитики)
   expectedCategories String? // JSON: ["stamp","material","welding",...]
   description     String?
+  tier             String   @default("synthetic") // synthetic | realistic | torture | real | dxf
   isActive        Boolean  @default(true)
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
   createdAt       DateTime @default(now())
   findings        BenchFinding[]
 
   @@index([category])
+  @@index([tier])
   @@index([documentType])
   @@index([isActive])
+  @@index([organizationId])
 }
 
 // Один прогон стенда (запуск всех активных семплов)
@@ -328,6 +337,8 @@ model BenchRun {
   totalFalsePos   Int      @default(0) // ложные срабатывания
   totalFalseNeg   Int      @default(0) // пропущенные
   notes           String?
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
   findings        BenchFinding[]
 
   @@index([status])
@@ -344,18 +355,18 @@ model BenchFinding {
   foundTitle      String?
   foundSeverity   String?  // high | medium | low
   foundField      String?
+  foundX          Float?   // координата X найденной ошибки (мм)
+  foundY          Float?   // координата Y найденной ошибки (мм)
+  sourceOcr       String?  // "svg" | "tesseract" | "paddle" | "vlm" | "cad"
   // Ожидаемая ошибка (если matched)
   expectedCode    String?
   expectedTitle   String?
   expectedSeverity String?
-  // Соответствие
-  status          String   // "matched" | "false_positive" | "false_negative" | "expected_only"
-  // Координаты (для проверки координатной точности)
   expectedX       Float?
   expectedY       Float?
-  foundX          Float?
-  foundY          Float?
-  coordDelta      Float?   // расстояние в мм (если применимо)
+  // Соответствие
+  status          String   // "matched" | "false_positive" | "false_negative"
+  coordDelta      Float?   // расстояние между found и expected в мм
   createdAt       DateTime @default(now())
   run             BenchRun   @relation(fields: [runId], references: [id], onDelete: Cascade)
   sample          BenchSample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
@@ -363,5 +374,27 @@ model BenchFinding {
   @@index([runId])
   @@index([sampleId])
   @@index([status])
+  @@index([sourceOcr])
+}
+
+// ============ FEEDBACK LOOP (Блок 4) ============
+
+model KnowledgeSuggestion {
+  id          String   @id @default(cuid())
+  type        String   // "bench_sample" | "new_rule" | "reference_entry"
+  status      String   @default("new") // new | approved | rejected
+  title       String
+  description String?
+  payload     String?  // JSON: { code, category, expectedFindings, filePath }
+  issueId     String?
+  issue       Issue?   @relation(fields: [issueId], references: [id])
+  organizationId String?
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([organizationId])
 }
 

@@ -39,7 +39,7 @@ export function UploadDocumentDialog({
   const upload = useUploadDocument()
 
   const [file, setFile] = React.useState<File | null>(null)
-  const [projectId, setProjectId] = React.useState<string>('')
+  const [projectId, setProjectId] = React.useState<string>('__none__')
   const [dragOver, setDragOver] = React.useState(false)
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -66,7 +66,7 @@ export function UploadDocumentDialog({
     if (!file) return
     const res = await upload.mutateAsync({
       file,
-      projectId: projectId || undefined,
+      projectId: projectId === '__none__' ? undefined : projectId,
     })
     if (res?.document) {
       onUploaded?.(res.document.id)
@@ -148,7 +148,7 @@ export function UploadDocumentDialog({
               <SelectValue placeholder="Без проекта" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Без проекта</SelectItem>
+              <SelectItem value="__none__">Без проекта</SelectItem>
               {(projectsData?.items ?? []).map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.code} — {p.name}

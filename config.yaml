@@ -1,0 +1,55 @@
+// config.yaml — единый файл конфигурации НК-Контроль
+// Все дефолты работают из коробки. Админ-консоль на 3333 пишет в этот файл.
+
+server:
+  port_main: 1111       # Основной сайт нормоконтролёра
+  port_admin: 3333      # Инженерная консоль («матрица»)
+  host: "0.0.0.0"       # 0.0.0.0 = весь сетевой интерфейс; 127.0.0.1 = только localhost
+
+database:
+  type: sqlite
+  path: "db/custom.db"  # Относительно рабочей директории
+
+ocr:
+  engine: "paddleocr"   # paddleocr | tesseract | vlm
+  paddleocr_url: "http://localhost:8100"
+  tesseract_lang: "rus+eng"
+  confidence_cutoff: 0.4   # Ниже этого — fallback на VLM
+  dpi_target: 300
+  downscale_max: 1000       # px, 0 = без downscale
+  zone_crop: true            # Кроп зон штампа перед OCR
+
+models:
+  llm_mode: "cloud_vlm"     # cloud_vlm | local_ollama | off
+  ollama_url: "http://localhost:11434"
+  ollama_model: "qwen2.5:14b-instruct"
+  local_only: false          # true = запрещает облачные VLM (СБ верфи)
+  vlm_model: "glm-4.5v"
+  llm_model: "glm-4.6"
+
+bench:
+  auto_run: false            # Автозапуск бенча при старте
+  release_gate: true         # Блокировка релиза при красном бенче
+
+rules:
+  categories_enabled:
+    - stamp
+    - material
+    - welding
+    - format
+    - geometry
+    - specification
+    - semantic
+    - cad_attr
+    - tolerances
+    - shipbuilding
+  industry_module: "shipbuilding"  # shipbuilding | machinery | general
+
+uploads:
+  max_size_mb: 50
+  allowed_types: ["png", "jpg", "jpeg", "pdf", "dxf", "dwg", "cdw", "sldprt", "sldasm", "slddrw", "spw"]
+
+organization:
+  name: ""                   # Заполняется мастером первого запуска
+  industry: ""               # shipbuilding | machinery | oil_gas | general
+  admin_password: ""          # Хэш пароля админа
