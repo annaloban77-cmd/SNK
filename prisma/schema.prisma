@@ -282,9 +282,10 @@ model Subscription {
 // Эталонный/контрольный документ для стенда
 model BenchSample {
   id              String   @id @default(cuid())
-  code            String   @unique // "S-001", "E-042"
+  code            String   @unique // "S-001", "E-042", "R-001", "D-001", "X-001"
   title           String   // описание семпла
   category        String   // тип: "correct" | "with_errors"
+  tier             String   @default("synthetic") // synthetic | realistic | torture | real | dxf
   documentType    String   // "drawing" | "assembly" | "specification" | "welding" | "circuit" | "cad"
   format          String   // A4 | A3 | A2 | A1 | A0
   sourceType      String   // "scan" | "pdf" | "dwg" | "dxf" | "cdw" | "sldprt" | "sldasm" | "slddrw" | "spw"
@@ -294,12 +295,15 @@ model BenchSample {
   expectedHigh    Int      @default(0)
   expectedMedium  Int      @default(0)
   expectedLow     Int      @default(0)
-  // Категории ожидаемых ошибок (для аналитики)
   expectedCategories String? // JSON: ["stamp","material","welding",...]
   description     String?
   tier             String   @default("synthetic") // synthetic | realistic | torture | real | dxf
   isActive        Boolean  @default(true)
+<<<<<<< HEAD
   organizationId  String?
+=======
+  organizationId  String?  // P3: свой бенч на организацию
+>>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
   organization    Organization? @relation(fields: [organizationId], references: [id])
   createdAt       DateTime @default(now())
   findings        BenchFinding[]
@@ -311,38 +315,39 @@ model BenchSample {
   @@index([organizationId])
 }
 
-// Один прогон стенда (запуск всех активных семплов)
+// Один прогон стенда (запуск семплов по tier)
 model BenchRun {
   id              String   @id @default(cuid())
-  version         String   // версия ядра/правил (например "0.2.1")
+  version         String   // версия ядра/правил
+  tier             String   @default("all") // synthetic | realistic | torture | real | dxf | all
   status          String   @default("running") // running | completed | failed | aborted
   startedAt       DateTime @default(now())
   finishedAt      DateTime?
   durationMs      Int?
-  // Метрики агрегированные
+  organizationId  String?  // P3: стенд привязан к бюро
+  organization    Organization? @relation(fields: [organizationId], references: [id])
   totalSamples    Int      @default(0)
-  passedSamples   Int      @default(0) // семплы где Recall>=90% Precision>=85%
+  passedSamples   Int      @default(0)
   failedSamples   Int      @default(0)
-  // Recall/Precision по всему прогону
-  recall          Float?   // 0..1, доля ожидаемых ошибок найденных
-  precision       Float?   // 0..1, доля найденных соответствующих ожиданиям
-  recallHigh      Float?   // Recall только по высококритичным
-  coordAccuracy   Float?   // среднее отклонение в мм (меньше = лучше)
-  // Статус «зелёный/жёлтый/красный»
+  recall          Float?   // 0..1
+  precision       Float?   // 0..1
+  recallHigh      Float?   // 0..1
+  coordAccuracy   Float?   // среднее отклонение в мм (меньше = лучше), null если нет координат
   benchStatus     String?  // "green" | "yellow" | "red"
-  // Сводка
   totalExpected   Int      @default(0)
   totalFound      Int      @default(0)
-  totalMatched    Int      @default(0) // истинные срабатывания
-  totalFalsePos   Int      @default(0) // ложные срабатывания
-  totalFalseNeg   Int      @default(0) // пропущенные
+  totalMatched    Int      @default(0)
+  totalFalsePos   Int      @default(0)
+  totalFalseNeg   Int      @default(0)
   notes           String?
   organizationId  String?
   organization    Organization? @relation(fields: [organizationId], references: [id])
   findings        BenchFinding[]
 
   @@index([status])
+  @@index([tier])
   @@index([startedAt])
+  @@index([organizationId])
 }
 
 // Результат проверки одного семпла в рамках прогона
@@ -350,13 +355,13 @@ model BenchFinding {
   id              String   @id @default(cuid())
   runId           String
   sampleId        String
-  // Что нашла система
-  foundCode       String?  // код правила
+  foundCode       String?
   foundTitle      String?
-  foundSeverity   String?  // high | medium | low
+  foundSeverity   String?
   foundField      String?
   foundX          Float?   // координата X найденной ошибки (мм)
   foundY          Float?   // координата Y найденной ошибки (мм)
+<<<<<<< HEAD
   sourceOcr       String?  // "svg" | "tesseract" | "paddle" | "vlm" | "cad"
   // Ожидаемая ошибка (если matched)
   expectedCode    String?
@@ -365,6 +370,14 @@ model BenchFinding {
   expectedX       Float?
   expectedY       Float?
   // Соответствие
+=======
+  sourceOcr       String?  // "svg" | "tesseract" | "paddle" | "vlm" | "cad" — какой движок нашёл
+  expectedCode    String?
+  expectedTitle   String?
+  expectedSeverity String?
+  expectedX       Float?   // координата X ожидаемой ошибки (мм)
+  expectedY       Float?   // координата Y ожидаемой ошибки (мм)
+>>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
   status          String   // "matched" | "false_positive" | "false_negative"
   coordDelta      Float?   // расстояние между found и expected в мм
   createdAt       DateTime @default(now())
@@ -377,6 +390,105 @@ model BenchFinding {
   @@index([sourceOcr])
 }
 
+<<<<<<< HEAD
+=======
+// ============ СПРАВОЧНИКИ (Блок 3) ============
+
+model Material {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  category  String   // steel | bronze | brass | aluminum | polymer
+  params    String?  // JSON: {grade, tensile, yield, elongation, impact}
+  createdAt DateTime @default(now())
+  @@index([category])
+  @@index([gost])
+}
+
+model Fastener {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // bolt | nut | washer | screw | stud
+  params    String?  // JSON: {diameter, length, pitch, grade, coating}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model Bearing {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  params    String?  // JSON: {innerD, outerD, width, type}
+  createdAt DateTime @default(now())
+  @@index([gost])
+}
+
+model RolledProduct {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // sheet | bar | angle | channel | beam | pipe
+  params    String?  // JSON: {thickness, width, length, diameter, wallThickness}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model WeldingMaterial {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // electrode | wire | flux
+  params    String?  // JSON: {grade, coating, diameter}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model Coating {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // primer | enamel | putty | powder
+  params    String?  // JSON: {color, thickness, compatibleWith}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model PipeFitting {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // flange | elbow | tee | reducer | cap | valve
+  params    String?  // JSON: {diameter, pressure, material}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+model ShipEquipment {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  gost      String
+  type      String   // pump | separator | anchor | winch | valve
+  params    String?  // JSON: {capacity, pressure, material}
+  createdAt DateTime @default(now())
+  @@index([type])
+  @@index([gost])
+}
+
+>>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
 // ============ FEEDBACK LOOP (Блок 4) ============
 
 model KnowledgeSuggestion {
@@ -385,9 +497,18 @@ model KnowledgeSuggestion {
   status      String   @default("new") // new | approved | rejected
   title       String
   description String?
+<<<<<<< HEAD
   payload     String?  // JSON: { code, category, expectedFindings, filePath }
   issueId     String?
   issue       Issue?   @relation(fields: [issueId], references: [id])
+=======
+  // Для bench_sample: предзаполненный expected JSON
+  payload     String?  // JSON: { code, category, expectedFindings, filePath }
+  // Связь с источником
+  issueId     String?  // связанный Issue (FP или FN)
+  issue       Issue?   @relation(fields: [issueId], references: [id])
+  // Связь с организацией
+>>>>>>> 441246a551b8193c792b98be849acad0c1f605dc
   organizationId String?
   organization Organization? @relation(fields: [organizationId], references: [id])
   createdAt   DateTime @default(now())

@@ -25,15 +25,15 @@ export async function terminateZoneOcr() {
 export interface ZoneOcrResult {
   stamp: StampFields
   method: 'zone-ocr' | 'none'
+  sourceOcr: 'tesseract' | 'paddleocr' | 'vlm' | 'none' // какой движок сработал
   durationMs: number
   confidence: number
   rawText: string
-  preprocessing?: { skewAngle?: number; dpi?: number }
-  // Per-field metadata: для каждого поля — был ли текст в зоне, confidence, распарсен ли
+  preprocessing?: { skewAngle?: number; dpi?: number; qualityScore?: number }
   fieldMeta?: Record<string, { hasText: boolean; confidence: number; parsed: boolean }>
 }
 
-// Главный метод — zone-OCR штампа (оптимизированный: 2-3 вызова Tesseract)
+// Главный метод — zone-OCR штампа (улучшенный preprocessing)
 export async function extractStampWithZoneOcr(filePath: string): Promise<ZoneOcrResult> {
   const start = Date.now()
 
@@ -43,41 +43,52 @@ export async function extractStampWithZoneOcr(filePath: string): Promise<ZoneOcr
     const w = meta.width || 1000
     const h = meta.height || 1414
 
-    // 1. Бинаризация (Otsu) для лучшего OCR
-    const grayBuf = await img.grayscale().raw().toBuffer({ resolveWithObject: true })
-    const threshold = otsuThreshold(grayBuf.data)
-    const binaryBuf = Buffer.alloc(grayBuf.data.length)
-    for (let i = 0; i < grayBuf.data.length; i++) {
-      binaryBuf[i] = grayBuf.data[i] < threshold ? 0 : 255
+    // 1. Препроцессинг: upscale до ~300 DPI + normalize + sharpen
+    // Определяем целевой размер для 300 DPI (A4=2480x3508, A3=3508x4961)
+    const longSide = Math.max(w, h)
+    const targetLong = longSide < 1500 ? Math.round(longSide * 2) : longSide // ~2x upscale для маленьких
+    const scale = Math.min(3, targetLong / longSide) // не больше 3x
+
+    const preprocessed = await img
+      .grayscale()
+      .normalize()
+      .sharpen({ sigma: 1.0, m1: 2, m2: 1 })
+      .resize(Math.round(w * scale), Math.round(h * scale), { fit: 'fill', kernel: 'lanczos3' })
+      .raw()
+      .toBuffer({ resolveWithObject: true })
+
+    const ppW = preprocessed.info.width
+    const ppH = preprocessed.info.height
+
+    // 1a. Otsu бинаризация на улучшенном изображении
+    const threshold = otsuThreshold(preprocessed.data)
+    const binaryBuf = Buffer.alloc(preprocessed.data.length)
+    for (let i = 0; i < preprocessed.data.length; i++) {
+      binaryBuf[i] = preprocessed.data[i] < threshold ? 0 : 255
     }
     const binaryPng = await sharp(binaryBuf, {
-      raw: { width: grayBuf.info.width, height: grayBuf.info.height, channels: 1 },
+      raw: { width: ppW, height: ppH, channels: 1 },
     }).png().toBuffer()
 
-    // 2. Frame detection — находим рамку для точного позиционирования штампа
-    const frame = detectFrame(grayBuf.data, grayBuf.info.width, grayBuf.info.height)
+    // 2. Frame detection на улучшенном изображении
+    const frame = detectFrame(preprocessed.data, ppW, ppH)
 
     // 2a. Кроп штампа (нижний-правый угол, с учётом frame)
-    // Если frame найден — штамп в правом нижнем углу frame
-    // Если нет — используем относительные позиции
     let stampX: number, stampY: number, stampW: number, stampH: number
     if (frame) {
-      // Штамп: 185×55мм, frame ~A4 (210×297мм)
-      // stampW = 185/210 * frameW ≈ 0.88 * frameW — но это слишком широко
-      // На самом деле в наших SVG штамп ~340px при frame ~960px → 0.354
       stampW = Math.round(frame.w * 0.36)
       stampH = Math.round(frame.h * 0.13)
       stampX = frame.x + frame.w - stampW - Math.round(frame.w * 0.02)
       stampY = frame.y + frame.h - stampH - Math.round(frame.h * 0.01)
     } else {
-      stampX = Math.round(w * 0.60)
-      stampY = Math.round(h * 0.82)
-      stampW = Math.min(Math.round(w * 0.38), w - stampX - 1)
-      stampH = Math.min(Math.round(h * 0.16), h - stampY - 1)
+      stampX = Math.round(ppW * 0.60)
+      stampY = Math.round(ppH * 0.82)
+      stampW = Math.min(Math.round(ppW * 0.38), ppW - stampX - 1)
+      stampH = Math.min(Math.round(ppH * 0.16), ppH - stampY - 1)
     }
 
     // 2b. Ink detection — проверяем наличие тёмных пикселей в зонах полей
-    const inkMeta = await detectInkInZones(binaryPng, grayBuf.info.width, grayBuf.info.height, stampX, stampY, stampW, stampH)
+    const inkMeta = await detectInkInZones(binaryPng, ppW, ppH, stampX, stampY, stampW, stampH)
 
     const stampImg = await sharp(binaryPng)
       .extract({ left: stampX, top: stampY, width: stampW, height: stampH })
@@ -124,16 +135,16 @@ export async function extractStampWithZoneOcr(filePath: string): Promise<ZoneOcr
     } catch {}
 
     // 5. Парсинг полей из fullText + fmtText
-    const fieldMeta = parseStampFromZoneText(stamp, fullLines, fmtText, w, h)
+    const fieldMeta = parseStampFromZoneText(stamp, fullLines, fmtText, ppW, ppH)
     // 5a. Объединяем с ink detection (приоритетнее для hasText)
     mergeInkIntoMeta(fieldMeta, inkMeta)
 
     // 6. Вызов 3 (опционально): ТТ
     try {
-      const ttX = Math.round(w * 0.05)
-      const ttY = Math.round(h * 0.50)
-      const ttW = Math.min(Math.round(w * 0.45), w - ttX - 1)
-      const ttH = Math.min(Math.round(h * 0.20), h - ttY - 1)
+      const ttX = Math.round(ppW * 0.05)
+      const ttY = Math.round(ppH * 0.50)
+      const ttW = Math.min(Math.round(ppW * 0.45), ppW - ttX - 1)
+      const ttH = Math.min(Math.round(ppH * 0.20), ppH - ttY - 1)
       const ttImg = await sharp(binaryPng)
         .extract({ left: ttX, top: ttY, width: ttW, height: ttH })
         .resize(ttW * 2, ttH * 2, { fit: 'fill', kernel: 'lanczos3' })
@@ -148,13 +159,17 @@ export async function extractStampWithZoneOcr(filePath: string): Promise<ZoneOcr
 
     const avgConf = (fullConf + fmtConf) / 2
 
+    // Quality Gate: оценка качества изображения (0-100)
+    const qualityScore = computeQualityScore(preprocessed.data, ppW, ppH)
+
     return {
       stamp,
       method: 'zone-ocr',
+      sourceOcr: 'tesseract',
       durationMs: Date.now() - start,
       confidence: avgConf,
       rawText: `[full:${Math.round(fullConf*100)}%] ${fullText}\n[fmt:${Math.round(fmtConf*100)}%] ${fmtText}`,
-      preprocessing: { dpi: Math.round(w / 297 * 25.4) },
+      preprocessing: { dpi: Math.round(ppW / 297 * 25.4), qualityScore },
       fieldMeta,
     }
   } catch (e) {
@@ -162,6 +177,7 @@ export async function extractStampWithZoneOcr(filePath: string): Promise<ZoneOcr
     return {
       stamp: {},
       method: 'none',
+      sourceOcr: 'none',
       durationMs: Date.now() - start,
       confidence: 0,
       rawText: '',
@@ -535,4 +551,65 @@ function otsuThreshold(data: Buffer): number {
     if (variance > maxVariance) { maxVariance = variance; threshold = t }
   }
   return threshold
+}
+
+// Quality Gate: оценка качества изображения 0-100
+// Компоненты: контраст (std dev), резкость (Laplacian variance), DPI, шум
+function computeQualityScore(data: Buffer, w: number, h: number): number {
+  let score = 0
+
+  // 1. Контраст: стандартное отклонение яркости (0-30 баллов)
+  let sum = 0, sumSq = 0, count = 0
+  const step = Math.max(1, Math.floor(data.length / 50000)) // сэмплируем для скорости
+  for (let i = 0; i < data.length; i += step) {
+    const v = data[i]
+    sum += v
+    sumSq += v * v
+    count++
+  }
+  const mean = sum / count
+  const variance = sumSq / count - mean * mean
+  const stdDev = Math.sqrt(Math.max(0, variance))
+  // stdDev 0-20 = плохой, 50+ = отличный
+  score += Math.min(30, Math.max(0, (stdDev / 50) * 30))
+
+  // 2. Резкость: дисперсия Лапласа (0-30 баллов)
+  let lapSum = 0, lapSq = 0, lapCount = 0
+  const lapStep = Math.max(2, Math.floor(w / 500))
+  for (let y = 1; y < h - 1; y += lapStep) {
+    for (let x = 1; x < w - 1; x += lapStep) {
+      const idx = y * w + x
+      const lap = Math.abs(
+        4 * data[idx] -
+        data[idx - 1] - data[idx + 1] -
+        data[idx - w] - data[idx + w]
+      )
+      lapSum += lap
+      lapSq += lap * lap
+      lapCount++
+    }
+  }
+  const lapMean = lapSum / lapCount
+  const lapVar = lapSq / lapCount - lapMean * lapMean
+  // lapVar 0 = очень blur, 500+ = резко
+  score += Math.min(30, Math.max(0, (Math.sqrt(Math.max(0, lapVar)) / 25) * 30))
+
+  // 3. DPI: больше = лучше (0-20 баллов)
+  const dpi = Math.round(w / 297 * 25.4) // предполагаем A4
+  // 150 DPI = 10, 200 DPI = 15, 300+ DPI = 20
+  score += Math.min(20, Math.max(5, (dpi / 300) * 20))
+
+  // 4. Шум/чистота: отношение тёмных к светлым (0-20 баллов)
+  // Хорошее бинаризованное изображение имеет ~5-15% тёмных пикселей
+  let dark = 0
+  for (let i = 0; i < data.length; i += step) {
+    if (data[i] < 128) dark++
+  }
+  const darkRatio = dark / count
+  // 5-15% = отлично, <5% или >30% = плохо
+  if (darkRatio >= 0.03 && darkRatio <= 0.20) score += 20
+  else if (darkRatio >= 0.01 && darkRatio <= 0.35) score += 10
+  else score += 0
+
+  return Math.round(Math.max(0, Math.min(100, score)))
 }

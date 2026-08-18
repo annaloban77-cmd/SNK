@@ -34,13 +34,13 @@ export function filterFindings(
   let result = [...findings]
 
   // 0. Confidence-aware filtering
-  // Если OCR confidence < 0.35 — фильтруем ВСЕ "поле отсутствует" findings
-  // (не можем доверять что поле действительно отсутствует, а не просто не распознано)
-  // "Wrong value" findings (масса с точкой, материал без ГОСТ) оставляем
-  if (ocrConfidence < 0.45) {
+  // Если OCR confidence < 0.45 и source != VLM — фильтруем "поле отсутствует"
+  // VLM с confidence >= 0.8 видит поля целиком, доверяем "missing" findings
+  const isVlmHighConf = ocrConfidence >= 0.8
+  if (ocrConfidence < 0.45 && !isVlmHighConf) {
     // Nuclear option: при низком confidence не генерируем "missing" findings вообще
     result = result.filter(f => !isMissingFieldFinding(f))
-  } else if (fieldMeta) {
+  } else if (fieldMeta && !isVlmHighConf) {
     // При нормальном confidence — используем per-field метаданные
     result = result.filter(f => {
       if (!isMissingFieldFinding(f)) return true

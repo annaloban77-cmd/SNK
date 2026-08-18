@@ -6,7 +6,9 @@
       "code": "R-STAGE-001",
       "title": "Стадия не указана",
       "severity": "medium",
-      "field": "Стадия"
+      "field": "Стадия",
+      "x": 160,
+      "y": 5
     }
   ]
 }

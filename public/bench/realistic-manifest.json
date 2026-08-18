@@ -1,0 +1,454 @@
+[
+  {
+    "code": "R-001",
+    "originalCode": "S-001",
+    "title": "S-001 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-002",
+    "originalCode": "S-002",
+    "title": "S-002 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-003",
+    "originalCode": "S-003",
+    "title": "S-003 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-004",
+    "originalCode": "S-004",
+    "title": "S-004 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-005",
+    "originalCode": "S-005",
+    "title": "S-005 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-006",
+    "originalCode": "S-006",
+    "title": "S-006 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-007",
+    "originalCode": "S-007",
+    "title": "S-007 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-008",
+    "originalCode": "S-008",
+    "title": "S-008 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-009",
+    "originalCode": "S-009",
+    "title": "S-009 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-010",
+    "originalCode": "S-010",
+    "title": "S-010 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-011",
+    "originalCode": "S-011",
+    "title": "S-011 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-012",
+    "originalCode": "S-012",
+    "title": "S-012 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-013",
+    "originalCode": "S-013",
+    "title": "S-013 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-014",
+    "originalCode": "S-014",
+    "title": "S-014 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-015",
+    "originalCode": "S-015",
+    "title": "S-015 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "correct",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 0,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": []
+  },
+  {
+    "code": "R-016",
+    "originalCode": "E-001",
+    "title": "E-001 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass"
+    ]
+  },
+  {
+    "code": "R-017",
+    "originalCode": "E-002",
+    "title": "E-002 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "R-018",
+    "originalCode": "E-003",
+    "title": "E-003 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "R-019",
+    "originalCode": "E-004",
+    "title": "E-004 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "R-020",
+    "originalCode": "E-005",
+    "title": "E-005 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "R-021",
+    "originalCode": "E-006",
+    "title": "E-006 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "sign"
+    ]
+  },
+  {
+    "code": "R-022",
+    "originalCode": "E-007",
+    "title": "E-007 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "R-023",
+    "originalCode": "E-008",
+    "title": "E-008 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stamp"
+    ]
+  },
+  {
+    "code": "R-024",
+    "originalCode": "E-009",
+    "title": "E-009 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 0,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "scale"
+    ]
+  },
+  {
+    "code": "R-025",
+    "originalCode": "E-010",
+    "title": "E-010 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 1,
+    "expectedMedium": 0,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "mat"
+    ]
+  },
+  {
+    "code": "R-026",
+    "originalCode": "E-011",
+    "title": "E-011 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "letter"
+    ]
+  },
+  {
+    "code": "R-027",
+    "originalCode": "E-012",
+    "title": "E-012 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "stage"
+    ]
+  },
+  {
+    "code": "R-028",
+    "originalCode": "E-013",
+    "title": "E-013 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "tt"
+    ]
+  },
+  {
+    "code": "R-029",
+    "originalCode": "E-014",
+    "title": "E-014 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 1,
+    "expectedHigh": 0,
+    "expectedMedium": 1,
+    "expectedLow": 0,
+    "expectedCategories": [
+      "gost"
+    ]
+  },
+  {
+    "code": "R-030",
+    "originalCode": "E-015",
+    "title": "E-015 (realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10)",
+    "category": "with_errors",
+    "format": "A3",
+    "sourceType": "scan",
+    "degradation": "realistic: skew=0.3-1°, dpi=200-300, blur≤0.5, noise≤10",
+    "expectedCount": 3,
+    "expectedHigh": 1,
+    "expectedMedium": 1,
+    "expectedLow": 1,
+    "expectedCategories": [
+      "mass",
+      "mat",
+      "sign"
+    ]
+  }
+]

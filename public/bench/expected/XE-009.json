@@ -6,7 +6,9 @@
       "code": "R-LETTER-001",
       "title": "Литера не указана",
       "severity": "medium",
-      "field": "Литера"
+      "field": "Литера",
+      "x": 160,
+      "y": 10
     }
   ]
 }
