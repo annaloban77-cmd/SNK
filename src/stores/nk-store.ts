@@ -14,6 +14,7 @@ export type NKView =
   | 'apikeys'
   | 'audit'
   | 'bench'
+  | 'guide'
 
 interface NKStore {
   view: NKView

@@ -30,6 +30,7 @@ import {
   History,
   Sparkles,
   FlaskConical,
+  HelpCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useNKStore, type NKView } from '@/stores/nk-store'
@@ -50,6 +51,7 @@ import { Settings as SettingsView } from '@/components/nk/nk-settings'
 import { ApiKeys } from '@/components/nk/nk-api-keys'
 import { AuditLog } from '@/components/nk/nk-audit-log'
 import { Bench } from '@/components/nk/nk-bench'
+import { Guide } from '@/components/nk/nk-guide'
 
 interface NavItem {
   id: NKView
@@ -127,6 +129,7 @@ export default function Home() {
     { id: 'rules', label: 'Правила', icon: <ListChecks className="size-4" /> },
     { id: 'projects', label: 'Проекты', icon: <FolderKanban className="size-4" /> },
     { id: 'settings', label: 'Настройки', icon: <Settings className="size-4" /> },
+    { id: 'guide', label: 'Руководство', icon: <HelpCircle className="size-4" /> },
   ]
   // Admin-only items (visible on pro / enterprise plan)
   const adminNav: NavItem[] = isAdmin
@@ -168,6 +171,8 @@ export default function Home() {
         return <AuditLog />
       case 'bench':
         return <Bench />
+      case 'guide':
+        return <Guide />
       default:
         return <Dashboard />
     }
@@ -293,17 +298,7 @@ export default function Home() {
             <div className="flex h-full flex-col">
               {navList}
               <div className="mt-auto border-t p-3 text-[10px] text-muted-foreground">
-                <div className="font-medium">ЕСКД · СПДС · Регистр РФ</div>
-                <div className="mt-0.5">
-                  Документов: {dash ? dash.totalDocuments : '…'}
-                  {' · '} Справочников: {dash?.referenceCount ?? '…'}
-                  {' · '} v{dash?.dbVersion ?? '…'}
-                </div>
-                {orgQ.data ? (
-                  <div className="mt-0.5">
-                    Организация: <span className="font-medium">{orgQ.data.slug}</span>
-                  </div>
-                ) : null}
+                НК-Контроль v{dash?.dbVersion ?? '1.1.0'}
               </div>
             </div>
           </aside>
@@ -315,20 +310,7 @@ export default function Home() {
       {/* Footer (sticky) */}
       <footer className="mt-auto border-t bg-card/40">
         <div className="flex flex-col items-center justify-between gap-2 px-4 py-3 text-xs text-muted-foreground sm:flex-row md:px-6">
-          <div>© 2026 Северо-Верфь · НК-Контроль v1.1</div>
-          <div className="hidden items-center gap-3 sm:flex">
-            <span className="rounded border px-1.5 py-0.5">ЕСКД</span>
-            <span className="rounded border px-1.5 py-0.5">СПДС</span>
-            <span className="rounded border px-1.5 py-0.5">Регистр РФ</span>
-          </div>
-          <div>
-            База знаний: {standardsCount != null ? standardsCount : '…'} стандартов
-            {' · '}
-            {rulesCount != null ? rulesCount : '…'} правил
-            {' · '}
-            {dash?.referenceCount ?? '…'} справочников
-            {' · '} v{dash?.dbVersion ?? '…'}
-          </div>
+          <div>НК-Контроль v1.1 · © 2026</div>
         </div>
       </footer>
 

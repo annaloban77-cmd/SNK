@@ -80,14 +80,14 @@ export function Bench() {
     <div className="space-y-6">
       <PageHeader
         title="Стенд (Bench)"
-        description="Главный предохранитель релиза. Прогон тестовых документов с известными ошибками."
+        description="Предохранитель релиза. Тест на тестовых документах с известными ошибками."
         actions={
           <Button
             onClick={() => runBench.mutate({ runLlm: false, version: `bench-${new Date().toISOString().slice(0, 19)}` })}
             disabled={runBench.isPending || !!running}
           >
             <Play className="size-4 mr-2" />
-            {running ? 'Идёт прогон...' : 'Запустить прогон'}
+            {running ? 'Идёт тестирование...' : 'Запустить тест'}
           </Button>
         }
       />
@@ -113,7 +113,7 @@ export function Bench() {
           <CardContent className="p-4 flex items-center gap-3">
             <div className="size-3 rounded-full bg-amber-500 animate-pulse" />
             <div className="text-sm">
-              <span className="font-medium">Прогон {running.version}</span> выполняется...
+              <span className="font-medium">Тест {running.version}</span> выполняется...
               <span className="text-muted-foreground ml-2">начат {format(new Date(running.startedAt), 'HH:mm:ss', { locale: ru })}</span>
             </div>
           </CardContent>
@@ -124,7 +124,7 @@ export function Bench() {
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-[11px] uppercase text-muted-foreground">Всего семплов</div>
+            <div className="text-[11px] uppercase text-muted-foreground">Всего тестовых документов</div>
             <div className="mt-1 text-2xl font-bold">{samples?.total ?? '—'}</div>
           </CardContent>
         </Card>
@@ -144,7 +144,7 @@ export function Bench() {
           <CardContent className="p-4">
             <div className="text-[11px] uppercase text-muted-foreground">Статус</div>
             <div className="mt-1">
-              {lastRun ? <StatusBadge status={lastRun.benchStatus} /> : <Badge variant="outline">Нет прогонов</Badge>}
+              {lastRun ? <StatusBadge status={lastRun.benchStatus} /> : <Badge variant="outline">Нет тестов</Badge>}
             </div>
           </CardContent>
         </Card>
@@ -155,7 +155,7 @@ export function Bench() {
         <>
           <div>
             <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-              <Target className="size-5" /> Метрики последнего прогона
+              <Target className="size-5" /> Метрики последнего теста
               <span className="text-sm font-normal text-muted-foreground">— {lastRun.version}</span>
             </h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -171,11 +171,11 @@ export function Bench() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Activity className="size-4" /> Сводка прогона
+                  <Activity className="size-4" /> Сводка теста
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <Row label="Всего семплов" value={lastRun.totalSamples} />
+                <Row label="Всего документов" value={lastRun.totalSamples} />
                 <Row label="Пройдено (PASS)" value={lastRun.passedSamples} tone="emerald" />
                 <Row label="Провалено (FAIL)" value={lastRun.failedSamples} tone="red" />
                 <Row label="Ожидаемых ошибок" value={lastRun.totalExpected} />
@@ -191,9 +191,9 @@ export function Bench() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <History className="size-4" /> История прогонов
+                  <History className="size-4" /> История тестов
                 </CardTitle>
-                <CardDescription className="text-xs">Последние 5 прогонов</CardDescription>
+                <CardDescription className="text-xs">Последние 5 тестов</CardDescription>
               </CardHeader>
               <CardContent>
                 <ScrollArea className="max-h-72">
@@ -240,8 +240,8 @@ export function Bench() {
         <Card>
           <CardContent className="p-8 text-center text-muted-foreground">
             <FlaskConical className="size-12 mx-auto mb-3 opacity-50" />
-            <div className="text-lg font-medium">Прогонов стенда ещё нет</div>
-            <div className="text-sm mt-1">Нажмите «Запустить прогон» чтобы проверить систему на 100 тестовых документах</div>
+            <div className="text-lg font-medium">Тестов ещё нет</div>
+            <div className="text-sm mt-1">Нажмите «Запустить тест» чтобы проверить систему на тестовых документах</div>
           </CardContent>
         </Card>
       )}
@@ -273,7 +273,7 @@ function RunDetails({ runId }: { runId: string }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          <ChevronRight className="size-4" /> Детали прогона {run.version}
+          <ChevronRight className="size-4" /> Детали теста {run.version}
           <StatusBadge status={run.benchStatus} />
         </CardTitle>
       </CardHeader>
@@ -281,7 +281,7 @@ function RunDetails({ runId }: { runId: string }) {
         <Tabs defaultValue="errors">
           <TabsList>
             <TabsTrigger value="errors">С ошибками ({errorSamples.length})</TabsTrigger>
-            <TabsTrigger value="correct">Эталонные ({correctSamples.length})</TabsTrigger>
+            <TabsTrigger value="correct">Без ошибок ({correctSamples.length})</TabsTrigger>
           </TabsList>
           <TabsContent value="errors">
             <ScrollArea className="max-h-96">
