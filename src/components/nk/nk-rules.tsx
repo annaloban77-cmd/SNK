@@ -48,6 +48,7 @@ import { SeverityBadge } from './nk-severity-badge'
 import {
   categoryLabel,
   methodLabel,
+  methodHint,
   formatDate,
 } from './nk-format'
 import type { RuleDto, Severity } from '@/lib/types'
@@ -67,9 +68,9 @@ const CATEGORY_FORM_OPTIONS = CATEGORY_OPTIONS.filter((o) => o.value !== 'all')
 
 const METHOD_OPTIONS = [
   { value: 'all', label: 'Все методы' },
-  { value: 'deterministic', label: 'Детерминированное' },
-  { value: 'semantic', label: 'Семантическое' },
-  { value: 'vision', label: 'VLM' },
+  { value: 'deterministic', label: 'Автопроверка по формату' },
+  { value: 'semantic', label: 'Проверка смысла (ИИ)' },
+  { value: 'vision', label: 'Проверка чертежа (ИИ)' },
 ]
 
 const METHOD_FORM_OPTIONS = METHOD_OPTIONS.filter((o) => o.value !== 'all')
@@ -126,7 +127,7 @@ export function Rules() {
     <div className="space-y-5">
       <PageHeader
         title="Правила"
-        description="Детерминированные, семантические и VLM-правила нормоконтроля"
+        description="Детерминированные и ИИ-правила нормоконтроля"
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -139,13 +140,13 @@ export function Rules() {
               variant="outline"
               size="sm"
               onClick={() =>
-                toast.info('Прогон по бенчу', {
+                toast.info('Проверка на тестовых документах', {
                   description: 'В разработке — скоро будет доступно',
                 })
               }
             >
               <FlaskConical className="size-4" />
-              Прогнать по бенчу
+              Проверить на тестовых документах
             </Button>
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="size-4" />
@@ -517,6 +518,7 @@ function CreateRuleDialog({
 }) {
   const create = useCreateRule()
   const standardsQ = useStandards({ pageSize: 100 })
+  const [isAdmin] = React.useState<boolean>(() => readCurrentRole() === 'admin')
 
   const [code, setCode] = React.useState('')
   const [name, setName] = React.useState('')
@@ -525,8 +527,14 @@ function CreateRuleDialog({
   const [method, setMethod] = React.useState('deterministic')
   const [severity, setSeverity] = React.useState<Severity>('medium')
   const [gostField, setGostField] = React.useState('')
+  // Raw JSON kept in `expression`; the friendly form below writes to it.
   const [expression, setExpression] = React.useState('')
   const [standardId, setStandardId] = React.useState('__none__')
+  // Friendly rule-constructor state (auto-assembled into `expression`).
+  const [ruleField, setRuleField] = React.useState('designation')
+  const [ruleCondition, setRuleCondition] = React.useState('empty')
+  const [ruleValue, setRuleValue] = React.useState('')
+  const [engineerMode, setEngineerMode] = React.useState(false)
 
   React.useEffect(() => {
     if (!open) {
@@ -539,8 +547,24 @@ function CreateRuleDialog({
       setGostField('')
       setExpression('')
       setStandardId('__none__')
+      setRuleField('designation')
+      setRuleCondition('empty')
+      setRuleValue('')
+      setEngineerMode(false)
     }
   }, [open])
+
+  // Auto-assemble JSON from the friendly form fields whenever they change
+  // (unless the user is editing the raw JSON in engineer mode).
+  React.useEffect(() => {
+    if (engineerMode) return
+    const assembled = buildRuleExpression({
+      field: ruleField,
+      condition: ruleCondition,
+      value: ruleValue,
+    })
+    setExpression(assembled)
+  }, [ruleField, ruleCondition, ruleValue, engineerMode])
 
   function handleSubmit() {
     const payload: CreateRulePayload = {
@@ -638,6 +662,9 @@ function CreateRuleDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-[10px] text-muted-foreground">
+                {methodHint(method)}
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="rule-sev">Критичность</Label>
@@ -683,25 +710,36 @@ function CreateRuleDialog({
               placeholder="Например: ГОСТ 2.104-2006"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="rule-expr">Выражение / параметры (JSON)</Label>
-            <Textarea
-              id="rule-expr"
-              value={expression}
-              onChange={(e) => setExpression(e.target.value)}
-              placeholder={'{\n  "field": "designation",\n  "pattern": "^[A-Z0-9]+\\\\.[A-Z0-9]+$"\n}'}
-              rows={4}
-              className="font-mono text-xs"
-            />
-            <p className="text-[10px] text-muted-foreground">
-              JSON-выражение с параметрами правила (используется детерминированным движком).
-            </p>
-          </div>
+
+          <RuleConstructor
+            field={ruleField}
+            condition={ruleCondition}
+            value={ruleValue}
+            engineerMode={engineerMode}
+            isAdmin={isAdmin}
+            rawExpression={expression}
+            onFieldChange={setRuleField}
+            onConditionChange={setRuleCondition}
+            onValueChange={setRuleValue}
+            onEngineerModeChange={setEngineerMode}
+            onRawExpressionChange={setExpression}
+          />
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Отмена
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast.info('Проверка на тестовых документах', {
+                description: 'В разработке — скоро будет доступно',
+              })
+            }
+          >
+            <FlaskConical className="size-4" />
+            Проверить на тестовых документах
           </Button>
           <Button onClick={handleSubmit} disabled={!canSubmit}>
             {create.isPending ? (
@@ -714,5 +752,252 @@ function CreateRuleDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ============================================================================
+// Rule constructor — human-friendly replacement for the raw JSON textarea.
+// Пользователь выбирает «что проверяем» и «условие», а JSON-выражение для
+// детерминированного движка собирается автоматически. Администратор может
+// включить «Режим инженера» и править JSON вручную.
+// ============================================================================
+
+type Role = 'admin' | 'normocontroller' | 'engineer' | 'viewer'
+
+/** Прочитать текущую роль из cookie `nk-role` (тот же механизм, что в RoleSwitcher). */
+function readCurrentRole(): Role {
+  if (typeof document === 'undefined') return 'admin'
+  const match = document.cookie.match(/(?:^|;\s*)nk-role=([^;]+)/)
+  const r = match?.[1]
+  if (r === 'admin' || r === 'normocontroller' || r === 'engineer' || r === 'viewer') {
+    return r
+  }
+  return 'admin'
+}
+
+/** Опции поля «Что проверяем» — каждое значение = ключ в StampFields. */
+const RULE_FIELD_OPTIONS: { value: string; label: string }[] = [
+  { value: 'designation', label: 'Обозначение' },
+  { value: 'name', label: 'Наименование' },
+  { value: 'scale', label: 'Масштаб' },
+  { value: 'mass', label: 'Масса' },
+  { value: 'material', label: 'Материал' },
+  { value: 'letter', label: 'Литера' },
+  { value: 'stage', label: 'Стадия' },
+  { value: 'format', label: 'Формат' },
+  { value: 'signatures.developed', label: 'Подпись: Разраб' },
+  { value: 'signatures.checked', label: 'Подпись: Пров' },
+  { value: 'signatures.normControl', label: 'Подпись: Н.контр' },
+  { value: 'signatures.approved', label: 'Подпись: Утв' },
+  { value: 'gostReferences', label: 'ГОСТ-перечень' },
+  { value: 'technicalRequirements', label: 'Технические требования (ТТ)' },
+]
+
+/** Опции поля «Условие» — тип проверки. */
+const RULE_CONDITION_OPTIONS: {
+  value: string
+  label: string
+  hint: string
+}[] = [
+  {
+    value: 'empty',
+    label: 'Не заполнено',
+    hint: 'Поле пустое или отсутствует в штампе.',
+  },
+  {
+    value: 'regex',
+    label: 'Не соответствует шаблону',
+    hint: 'Значение должно соответствовать регулярному выражению (шаблону).',
+  },
+  {
+    value: 'lookup',
+    label: 'Отсутствует в справочнике',
+    hint: 'Значение должно входить в список разрешённых (через запятую).',
+  },
+  {
+    value: 'range',
+    label: 'Значение вне диапазона',
+    hint: 'Числовое значение должно быть в диапазоне «мин-макс».',
+  },
+]
+
+/**
+ * Собрать JSON-выражение правила из трёх дружелюбных полей.
+ * Возвращает пустую строку, если ничего не выбрано / значение не нужно.
+ */
+function buildRuleExpression(input: {
+  field: string
+  condition: string
+  value: string
+}): string {
+  const { field, condition, value } = input
+  const trimmed = value.trim()
+
+  switch (condition) {
+    case 'empty':
+      return JSON.stringify({ field, check: 'empty' }, null, 2)
+    case 'regex':
+      if (!trimmed) return JSON.stringify({ field, check: 'regex' }, null, 2)
+      return JSON.stringify(
+        { field, check: 'regex', pattern: trimmed },
+        null,
+        2
+      )
+    case 'lookup':
+      if (!trimmed) return JSON.stringify({ field, check: 'lookup' }, null, 2)
+      return JSON.stringify(
+        { field, check: 'lookup', values: trimmed },
+        null,
+        2
+      )
+    case 'range':
+      if (!trimmed) return JSON.stringify({ field, check: 'range' }, null, 2)
+      return JSON.stringify(
+        { field, check: 'range', range: trimmed },
+        null,
+        2
+      )
+    default:
+      return ''
+  }
+}
+
+/** Подсказка-плейсхолдер для поля «Шаблон/значение» в зависимости от условия. */
+function ruleValuePlaceholder(condition: string): string {
+  switch (condition) {
+    case 'empty':
+      return 'Не требуется — условие проверяет только пустоту поля'
+    case 'regex':
+      return '^[А-ЯA-Z0-9]+\\.[А-ЯA-Z0-9]+\\.[А-ЯA-Z0-9]+$'
+    case 'lookup':
+      return 'Сталь 09Г2С, Сталь 10, Сталь 20 (через запятую)'
+    case 'range':
+      return '0.1-500 (мин-макс, в кг / мм / etc)'
+    default:
+      return ''
+  }
+}
+
+function RuleConstructor({
+  field,
+  condition,
+  value,
+  engineerMode,
+  isAdmin,
+  rawExpression,
+  onFieldChange,
+  onConditionChange,
+  onValueChange,
+  onEngineerModeChange,
+  onRawExpressionChange,
+}: {
+  field: string
+  condition: string
+  value: string
+  engineerMode: boolean
+  isAdmin: boolean
+  rawExpression: string
+  onFieldChange: (v: string) => void
+  onConditionChange: (v: string) => void
+  onValueChange: (v: string) => void
+  onEngineerModeChange: (v: boolean) => void
+  onRawExpressionChange: (v: string) => void
+}) {
+  const condHint =
+    RULE_CONDITION_OPTIONS.find((o) => o.value === condition)?.hint ?? ''
+
+  return (
+    <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          Конструктор условия
+        </Label>
+        {isAdmin ? (
+          <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
+            <Switch
+              checked={engineerMode}
+              onCheckedChange={onEngineerModeChange}
+              aria-label="Режим инженера"
+            />
+            Режим инженера (raw JSON)
+          </label>
+        ) : null}
+      </div>
+
+      {engineerMode && isAdmin ? (
+        <div className="space-y-1.5">
+          <Label htmlFor="rule-expr">Выражение / параметры (JSON)</Label>
+          <Textarea
+            id="rule-expr"
+            value={rawExpression}
+            onChange={(e) => onRawExpressionChange(e.target.value)}
+            placeholder={
+              '{\n  "field": "designation",\n  "check": "regex",\n  "pattern": "^[А-ЯA-Z0-9]+\\\\.[А-ЯA-Z0-9]+$"\n}'
+            }
+            rows={5}
+            className="font-mono text-xs"
+          />
+          <p className="text-[10px] text-muted-foreground">
+            Сырое JSON-выражение. Доступно только администратору для отладки
+            и сложных случаев, не покрываемых конструктором.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-field">Что проверяем</Label>
+            <Select value={field} onValueChange={onFieldChange}>
+              <SelectTrigger id="rule-field" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RULE_FIELD_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="rule-condition">Условие</Label>
+            <Select value={condition} onValueChange={onConditionChange}>
+              <SelectTrigger id="rule-condition" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RULE_CONDITION_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="rule-value">Шаблон / значение</Label>
+            <Input
+              id="rule-value"
+              value={value}
+              onChange={(e) => onValueChange(e.target.value)}
+              placeholder={ruleValuePlaceholder(condition)}
+              disabled={condition === 'empty'}
+              className="font-mono text-xs"
+            />
+            <p className="text-[10px] text-muted-foreground">{condHint}</p>
+          </div>
+
+          {/* Предпросмотр собираемого JSON — чтобы пользователь видел результат. */}
+          <div className="sm:col-span-2">
+            <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              JSON-выражение (собирается автоматически)
+            </div>
+            <pre className="mt-1 overflow-auto rounded-md border bg-muted/40 p-2 font-mono text-[11px]">
+              {rawExpression || '—'}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

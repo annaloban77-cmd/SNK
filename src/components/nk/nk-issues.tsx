@@ -29,12 +29,25 @@ import {
   Ban,
   Wrench,
   ShieldCheck,
+  FileText,
+  ChevronsUpDown,
+  Check as CheckIcon,
 } from 'lucide-react'
 import {
   useIssues,
   useBulkIssues,
+  useDocuments,
   type IssueFilters,
 } from '@/hooks/use-nk-api'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { PageHeader } from './nk-page-header'
 import { EmptyState, ErrorState } from './nk-empty-state'
 import { SeverityBadge } from './nk-severity-badge'
@@ -80,6 +93,8 @@ export function Issues() {
 
   const { data, isLoading, isError, refetch, isFetching } = useIssues(filters)
   const bulk = useBulkIssues()
+  // Подгружаем список документов для фильтра по имени (а не по ID)
+  const documentsQ = useDocuments({ pageSize: 100 })
 
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
   const allOnPage = data?.items ?? []
@@ -183,18 +198,12 @@ export function Issues() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">
-              ID документа
-            </label>
-            <Input
-              placeholder="documentId"
-              value={filters.documentId ?? ''}
-              onChange={(e) =>
-                setField('documentId', e.target.value || undefined)
-              }
-            />
-          </div>
+          <DocumentFilterField
+            value={filters.documentId ?? ''}
+            documents={documentsQ.data?.items ?? []}
+            isLoading={documentsQ.isLoading}
+            onChange={(v) => setField('documentId', v || undefined)}
+          />
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
               Поиск
@@ -388,6 +397,118 @@ export function Issues() {
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Поле фильтра «Документ» — выпадающий список с поиском по имени документа.
+ * Раньше это был текстовый ввод `documentId` (технический UUID), что
+ * было непонятно пользователю. Теперь он выбирает документ по имени,
+ * а в фильтр подставляется его ID.
+ */
+function DocumentFilterField({
+  value,
+  documents,
+  isLoading,
+  onChange,
+}: {
+  value: string
+  documents: { id: string; name: string; format?: string | null }[]
+  isLoading: boolean
+  onChange: (v: string) => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const [query, setQuery] = React.useState('')
+
+  const selected = documents.find((d) => d.id === value) ?? null
+
+  const filtered = React.useMemo(() => {
+    if (!query.trim()) return documents
+    const q = query.toLowerCase()
+    return documents.filter((d) => d.name.toLowerCase().includes(q))
+  }, [documents, query])
+
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">
+        Документ
+      </label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between font-normal"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+              {selected ? (
+                <span className="truncate">{selected.name}</span>
+              ) : (
+                <span className="text-muted-foreground">Все документы</span>
+              )}
+            </span>
+            <ChevronsUpDown className="size-3.5 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[320px] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder="Поиск по имени документа…"
+              value={query}
+              onValueChange={setQuery}
+            />
+            <CommandList>
+              <CommandEmpty>
+                {isLoading ? 'Загрузка…' : 'Документы не найдены'}
+              </CommandEmpty>
+              <CommandGroup>
+                <CommandItem
+                  value="__all__"
+                  onSelect={() => {
+                    onChange('')
+                    setOpen(false)
+                    setQuery('')
+                  }}
+                >
+                  <ShieldCheck className="size-3.5 text-muted-foreground" />
+                  <span className="flex-1">Все документы</span>
+                  {!value ? (
+                    <CheckIcon className="size-3.5 text-primary" />
+                  ) : null}
+                </CommandItem>
+                {filtered.map((d) => (
+                  <CommandItem
+                    key={d.id}
+                    value={d.id}
+                    onSelect={() => {
+                      onChange(d.id)
+                      setOpen(false)
+                      setQuery('')
+                    }}
+                  >
+                    <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate">{d.name}</span>
+                      {d.format ? (
+                        <span className="text-[10px] font-mono text-muted-foreground">
+                          {d.format}
+                        </span>
+                      ) : null}
+                    </span>
+                    {value === d.id ? (
+                      <CheckIcon className="size-3.5 text-primary" />
+                    ) : null}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

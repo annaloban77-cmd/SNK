@@ -61,15 +61,36 @@ export function categoryLabel(c: string): string {
   return CATEGORY_LABELS[c] ?? c
 }
 
-/** Translate a backend method enum to a Russian label */
+/**
+ * Translate a backend method enum to a Russian, human-friendly label.
+ * Технические значения (`deterministic`, `semantic`, `vision`) остаются в БД —
+ * меняются только UI-подписи, чтобы не пугать нормоконтролёра жаргоном.
+ */
 export const METHOD_LABELS: Record<string, string> = {
-  deterministic: 'Детерминированное',
-  semantic: 'Семантическое',
-  vision: 'VLM',
+  deterministic: 'Автопроверка по формату',
+  semantic: 'Проверка смысла (ИИ)',
+  vision: 'Проверка чертежа (ИИ)',
 }
 
 export function methodLabel(m: string): string {
   return METHOD_LABELS[m] ?? m
+}
+
+/**
+ * Дополнительные подсказки для тултипов — объясняют технический смысл метода
+ * там, где короткая подпись может быть неочевидна.
+ */
+export const METHOD_HINTS: Record<string, string> = {
+  deterministic:
+    'Жёсткие правила: формат листа, обозначение, масса, литера, подписи. Проверяются по формулам и регулярным выражениям без участия ИИ.',
+  semantic:
+    'ИИ-анализ смысла: согласованность полей, противоречия между заголовком и содержимым, корректность технических требований.',
+  vision:
+    'ИИ-распознавание чертежа: VLM-модель «видит» изображение штампа и извлекает из него поля основной надписи.',
+}
+
+export function methodHint(m: string): string | undefined {
+  return METHOD_HINTS[m]
 }
 
 /** Translate a standard type to Russian */

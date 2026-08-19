@@ -97,7 +97,7 @@ export function Bench() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Стенд (Bench)"
+        title="Стенд тестирования"
         description="Предохранитель релиза. Тест на тестовых документах с известными ошибками."
         actions={
           <Button

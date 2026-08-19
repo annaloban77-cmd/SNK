@@ -549,7 +549,7 @@ function SamplesDropdown({
           </div>
         ) : items.length === 0 ? (
           <div className="px-2 py-3 text-xs text-muted-foreground">
-            Семплы не найдены
+            Тестовые документы не найдены
           </div>
         ) : (
           items.map((s) => (
