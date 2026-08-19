@@ -1196,3 +1196,51 @@ Stage Summary:
 - Стало: withClausesCount=30, 134 пункта total (48 high + 59 medium + 27 low)
 - Покрытие: top-30 GOSTs (19 ЕСКД 2.104-2.316 + 1 материал 19281 + 10 доп.
   стандартов: 2.109, 2.201, 2.103, 25346, 25347, 2789, 5264, 14771, 9.032, 15150)
+
+---
+
+## Task ID: p4-readme
+**Agent:** general-purpose (sub agent)
+**Task:** Generate comprehensive README.md from the REAL codebase
+
+### Work Log
+- Прочитал worklog.md для контекста проекта (НК-Контроль, Next.js 16, Batch 7 завершён)
+- Изучил реальные исходники архитектуры:
+  - `prisma/schema.prisma` — 26 моделей (DocType, Project, Document, Standard, StandardClause, Rule, Issue, CheckLog, Organization, User, ApiKey, AuditLog, Subscription, BenchSample, BenchRun, BenchFinding, Meta, Material, Fastener, Bearing, RolledProduct, WeldingMaterial, Coating, PipeFitting, ShipEquipment, KnowledgeSuggestion)
+  - `src/lib/rules.ts` — 18 детерминированных правил в массиве `DETERMINISTIC_RULES` (R-FORMAT-001, R-STAMP-001..003, R-SCALE-001, R-MASS-001, R-MAT-001..003, R-LETTER-001, R-STAGE-001, R-SIGN-001..004, R-TT-001, R-GOST-001, R-CAD-NOSTAMP)
+  - `src/lib/ocr/stamp-ocr.ts` — цепочка OCR: SVG → PaddleOCR → Tesseract (zone-ocr) → VLM (last-resort при conf < 0.4)
+  - `src/lib/cad-parser.ts` — парсинг DXF/DWG/CDW/SLD (ATTDEF, метаданные, текстовые entities)
+  - `src/lib/bench.ts` — `runSingleSample()`, `runBench()`, `runReleaseGate()` с 3 tierами (synthetic/dxf/realistic), COORD_TOLERANCE_MM=5.0, порог 85%
+  - `src/lib/config-loader.ts` — Zod-схема `ConfigSchema`, атомарная запись через .tmp + rename
+  - `server.js` — dual-port: 1111 (main, все роуты кроме /admin) + 3333 (только /admin)
+  - `config.yaml` — server/ocr/models/bench/rules/uploads/organization секции
+  - `docker-compose.yml` — два сервиса app + ocr-service (8100)
+  - `package.json` — 13 npm-скриптов
+  - `src/middleware.ts` — ролевая защита на Edge-runtime (viewer/engineer/normocontroller/admin)
+  - `src/lib/format-detector.ts` — честный детектор формата: null вместо угадывания (P5)
+  - `docs/guide/tech.md` — извлёк принципы P1-P7 и ASCII-схему потока данных
+  - `src/app/api/bench/run/route.ts` — подтверждён watchdog `BENCH_WATCHDOG_MS = 10 * 60 * 1000`
+- README.md ранее отсутствовал — создан новый
+- Сформирован README.md (411 строк, на русском, под лимитом 500 строк):
+  - Заголовок + краткое описание + стек
+  - Назначение (7 пунктов)
+  - Таблица принципов P1-P7 с привязкой к файлам
+  - Архитектура: 5 слоёв (core/knowledge/rules/profiles/bench), ASCII-схема потока данных, таблица портов 1111/3333/8100
+  - Безопасность: middleware role-based, Zod-валидация, OOM protection, multi-tenant, аудит, API-ключи
+  - База данных: таблица 26 моделей с реальными числами (460 правил, 573 стандарта, 4403 справочников, 30 с пунктами), ASCII-схема связей
+  - Механизмы качества: 3 тира, релизный гейт GREEN/YELLOW/RED условия, db:sync, watchdog 10 мин, координатная точность
+  - Развёртывание: Docker, ручная установка (6 команд), конфигурация config.yaml, требования к железу
+  - Как расширять: новое правило (с примером кода), новый справочник, новый OCR-движок, новая отрасль
+  - Скрипты: таблица всех 13 npm-скриптов + доп. генераторы
+  - История решений: 6 обоснованных архитектурных решений (VLM не primary, не 10000 правил, SQLite, dual-port, детерминированный формат, координаты)
+  - Лицензия MIT
+- README не запускал lint (по условию задачи — README не код)
+- Все числа реальные из кода и tech.md; все пути файлов реальные
+
+### Изменения
+- **Создан**: `/home/z/my-project/README.md` (411 строк, новый файл)
+
+### Next Actions
+- При желании можно расширить раздел «API» таблицей всех `/api/*` роутов (GET/POST/PATCH/DELETE с ролями)
+- Можно добавить раздел «Скриншоты» со ссылками на `public/guide/img/tech-arch.png`
+- При переходе на PostgreSQL — обновить раздел «Почему SQLite»
