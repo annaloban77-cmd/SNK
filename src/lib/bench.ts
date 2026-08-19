@@ -373,6 +373,7 @@ export async function runBench(opts: {
   for (let bi = 0; bi < samples.length; bi += BATCH_SIZE) {
     const batch = samples.slice(bi, bi + BATCH_SIZE)
     console.log(`   ▶ batch ${Math.floor(bi/BATCH_SIZE)+1}/${Math.ceil(samples.length/BATCH_SIZE)}: ${batch.map(s=>s.code).join(', ')}`)
+    const batchFindings: any[] = [] // инкрементально сохраняем findings для живого прогресса
     const results = await Promise.allSettled(batch.map(sample =>
       runSingleSample({
         id: sample.id, code: sample.code, filePath: sample.filePath,
@@ -410,7 +411,7 @@ export async function runBench(opts: {
       }
 
       for (const m of result.matched) {
-        allFindings.push({
+        const f = {
           runId: run.id, sampleId: sample.id,
           foundCode: m.found.code, foundTitle: m.found.title, foundSeverity: m.found.severity,
           foundField: m.found.field, sourceOcr: m.found.sourceOcr || result.sourceOcr,
@@ -419,26 +420,38 @@ export async function runBench(opts: {
           expectedX: m.expected.x, expectedY: m.expected.y,
           foundX: m.found.x || null, foundY: m.found.y || null,
           coordDelta: m.delta,
-        })
+        }
+        allFindings.push(f)
+        batchFindings.push(f)
       }
       for (const fp of result.falsePositives) {
-        allFindings.push({
+        const f = {
           runId: run.id, sampleId: sample.id,
           foundCode: fp.code, foundTitle: fp.title, foundSeverity: fp.severity,
           foundField: fp.field, sourceOcr: fp.sourceOcr || result.sourceOcr,
           status: 'false_positive',
-        })
+        }
+        allFindings.push(f)
+        batchFindings.push(f)
       }
       for (const fn of result.falseNegatives) {
-        allFindings.push({
+        const f = {
           runId: run.id, sampleId: sample.id,
           expectedCode: fn.code, expectedTitle: fn.title, expectedSeverity: fn.severity,
           status: 'false_negative',
           expectedX: fn.x, expectedY: fn.y,
-        })
+        }
+        allFindings.push(f)
+        batchFindings.push(f)
       }
 
       console.log(`     ✓ ${sample.code}: recall=${(result.recall*100).toFixed(0)}% precision=${(result.precision*100).toFixed(0)}% coord=${result.coordAccuracy !== null ? result.coordAccuracy.toFixed(1)+'mm' : 'N/A'} src=${result.sourceOcr} found=${result.foundIssues.length} expected=${result.expectedFindings.length} ${isPass ? 'PASS' : 'FAIL'}`)
+    }
+    // Инкрементально сохраняем findings после каждой выборки — для живого прогресса
+    if (batchFindings.length > 0) {
+      for (let i = 0; i < batchFindings.length; i += 100) {
+        await db.benchFinding.createMany({ data: batchFindings.slice(i, i + 100) })
+      }
     }
   }
 
@@ -460,9 +473,8 @@ export async function runBench(opts: {
 
   const durationMs = Date.now() - start
 
-  for (let i = 0; i < allFindings.length; i += 100) {
-    await db.benchFinding.createMany({ data: allFindings.slice(i, i + 100) })
-  }
+  // Findings уже сохранены инкрементально во время прогона — для живого прогресса.
+  // Дополнительный batch create не нужен.
 
   await db.benchRun.update({
     where: { id: run.id },

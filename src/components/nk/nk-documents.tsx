@@ -65,7 +65,7 @@ import { IssuesSummary } from './nk-severity-badge'
 import { SourceBadge } from './nk-source-icon'
 import { UploadDocumentDialog } from './nk-upload-dialog'
 import { useNKStore } from '@/stores/nk-store'
-import { formatDateTime, formatBytes } from './nk-format'
+import { formatDateTime, formatBytes, SOURCE_TYPE_LABELS } from './nk-format'
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'Все статусы' },
@@ -82,6 +82,8 @@ const FORMAT_OPTIONS = [
   { value: 'A2', label: 'A2' },
   { value: 'A3', label: 'A3' },
   { value: 'A4', label: 'A4' },
+  // P5: честный формат — null это НЕ 'unknown' и НЕ 'A3', это отдельная группа
+  { value: 'none', label: 'CAD/Скан (формат не определён)' },
 ]
 
 const SOURCE_OPTIONS = [
@@ -338,9 +340,17 @@ export function Documents() {
                         ) : null}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono">
-                          {d.format}
-                        </Badge>
+                        {d.format ? (
+                          <Badge variant="outline" className="font-mono">
+                            {d.format}
+                          </Badge>
+                        ) : (
+                          // format=null → показываем бейдж типа источника (CAD/Скан),
+                          // НЕ 'unknown' и НЕ подмену 'A3' (P5: честный формат)
+                          <Badge variant="outline" className="text-muted-foreground border-dashed">
+                            {SOURCE_TYPE_LABELS[d.sourceType as keyof typeof SOURCE_TYPE_LABELS] ?? d.sourceType}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <SourceBadge sourceType={d.sourceType} />

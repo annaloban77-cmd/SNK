@@ -193,7 +193,7 @@ async function main() {
         originalName: 'Опора.sldasm',
         mimeType: 'application/octet-stream',
         size: 1048576,
-        format: 'A3',
+        format: null,
         sourceType: 'sldasm',
         status: 'failed',
         filePath: '',

@@ -1,66 +1,110 @@
 /**
- * Migration: recalculate document.format from 'unknown' (or empty) to a sensible default.
+ * Migration: честное определение формата документа.
+ *
+ * Принцип (P5: честный формат, без подмены):
+ *   - Если формат реально определён (штамп/заголовок CAD/пропорции изображения
+ *     в допуске 2% A-серии) -> сохраняем его.
+ *   - Если определить нельзя -> format = null. НЕ подменяем 'A3' по умолчанию
+ *     для CAD-источников — это будет обман пользователя.
  *
  * Strategy:
- *   - CAD source types (dwg/dxf/cdw/sld-asterisk/spw) -> 'A3' (most common in shipbuilding)
- *   - Scan/PDF/image source types -> infer from image aspect ratio when possible (uses sharp)
- *   - If file missing or unreadable -> 'A3' fallback
+ *   1. Сканы/PDF/image -> detectFormatFromImage (sharp metadata + 2% tolerance)
+ *   2. CAD (DWG/DXF/CDW/SolidWorks/SPW) -> detectFormatFromCad (только если в
+ *      stampAttributes есть валидный A0-A4; иначе null)
+ *   3. Текущее значение 'unknown' или пустое -> затираем в null
  *
- * Idempotent: re-running does not change rows that already have a valid A0-A5 format.
+ * Idempotent: повторный запуск не меняет строки, у которых уже валидный A0-A5
+ * (или уже null).
  *
- * Usage: `bun run scripts/migrate-formats.ts`
+ * Usage: `bun run db:migrate-formats`
  */
 import { db } from '../src/lib/db'
-import sharp from 'sharp'
+import { detectFormatFromImage, detectFormatFromCad } from '../src/lib/format-detector'
+import { parseCadFile } from '../src/lib/cad-parser'
 import { existsSync } from 'fs'
 import { resolve } from 'path'
 
-const CAD_SOURCES = new Set(['dwg', 'dxf', 'cdw', 'sldprt', 'sldasm', 'slddrw', 'spw'])
+const VALID_FORMATS = new Set(['A0', 'A1', 'A2', 'A3', 'A4'])
 
-async function detectFromImage(filePath: string): Promise<string | null> {
-  try {
-    const abs = resolve(filePath)
-    if (!existsSync(abs)) return null
-    const meta = await sharp(abs).metadata()
-    if (!meta.width || !meta.height) return null
-    const ratio = meta.width / meta.height
-    if (ratio < 0.75) return 'A4' // portrait
-    return 'A3'                  // landscape or square (most common in shipbuilding)
-  } catch {
+async function detectForDocument(d: {
+  sourceType: string
+  filePath: string
+  stampJson: string | null
+}): Promise<string | null> {
+  // 1. Если в stampJson уже есть валидный формат — доверяем ему
+  if (d.stampJson) {
+    try {
+      const stamp = JSON.parse(d.stampJson)
+      const f = (stamp?.format as string | undefined)?.trim()?.toUpperCase()
+      if (f && VALID_FORMATS.has(f)) return f
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  const ext = d.filePath.toLowerCase().split('.').pop() || ''
+  const isCad = ['dxf', 'dwg', 'sldprt', 'sldasm', 'slddrw', 'cdw', 'spw'].includes(ext)
+  const isImage = ['png', 'jpg', 'jpeg', 'webp', 'bmp'].includes(ext)
+
+  // 2. CAD: честное определение из stampAttributes (если файл доступен)
+  if (isCad && d.filePath && existsSync(resolve(d.filePath))) {
+    try {
+      const parsed = await parseCadFile(d.filePath)
+      return detectFormatFromCad({
+        stampAttributes: parsed.stampAttributes,
+        format: parsed.stampAttributes?.format,
+      })
+    } catch {
+      // fall through to null
+    }
     return null
   }
+
+  // 3. Image: честное определение по пропорциям (2% tolerance)
+  if (isImage && d.filePath && existsSync(resolve(d.filePath))) {
+    return await detectFormatFromImage(d.filePath)
+  }
+
+  // 4. PDF: попытка растеризовать первую страницу и определить пропорции
+  if (ext === 'pdf' && d.filePath && existsSync(resolve(d.filePath))) {
+    try {
+      return await detectFormatFromImage(d.filePath)
+    } catch {
+      return null
+    }
+  }
+
+  // 5. В остальных случаях — null (не подменяем)
+  return null
 }
 
 async function main() {
   const docs = await db.document.findMany({
-    select: { id: true, name: true, format: true, sourceType: true, filePath: true },
+    select: { id: true, name: true, format: true, sourceType: true, filePath: true, stampJson: true },
   })
-  const candidates = docs.filter((d) => !d.format || d.format === 'unknown' || d.format.trim() === '')
-  console.log(`[migrate-formats] Found ${candidates.length} of ${docs.length} documents with missing/unknown format`)
+  // Кандидаты на пересчёт: текущий формат пустой, 'unknown', или не входит в A0-A5
+  const candidates = docs.filter((d) => {
+    if (!d.format) return true // null → пробуем определить
+    const f = d.format.trim().toUpperCase()
+    return !VALID_FORMATS.has(f) // 'unknown', 'CAD', мусор → пересчитываем
+  })
+  console.log(`[migrate-formats] Found ${candidates.length} of ${docs.length} documents needing format recalculation`)
 
   let fixed = 0
+  let nulled = 0
   for (const d of candidates) {
-    let newFormat: string | null = null
-
-    // 1) CAD source → A3 (most common in shipbuilding; format itself is irrelevant for CAD metadata-only flow)
-    if (d.sourceType && CAD_SOURCES.has(d.sourceType)) {
-      newFormat = 'A3'
-    }
-    // 2) Scan/PDF/image → infer from aspect ratio if file exists
-    if (!newFormat && d.filePath) {
-      newFormat = await detectFromImage(d.filePath)
-    }
-    // 3) Fallback by source type
-    if (!newFormat) {
-      newFormat = d.sourceType && CAD_SOURCES.has(d.sourceType) ? 'A3' : 'A4'
-    }
-
+    const newFormat = await detectForDocument(d)
     await db.document.update({ where: { id: d.id }, data: { format: newFormat } })
     fixed++
-    console.log(`  ✓ ${d.name}: → ${newFormat}`)
+    if (newFormat) {
+      console.log(`  ✓ ${d.name}: → ${newFormat}`)
+    } else {
+      nulled++
+      console.log(`  • ${d.name}: → null (формат не определён)`)
+    }
   }
 
-  console.log(`[migrate-formats] Done. Updated ${fixed} documents.`)
+  console.log(`[migrate-formats] Done. Updated ${fixed} documents (${nulled} set to null).`)
 }
 
 main()

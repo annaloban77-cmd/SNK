@@ -92,8 +92,8 @@ export async function GET() {
 
   const formatMap = new Map<string, number>()
   for (const d of documents) {
-    // P5: форматы пересчитываются миграцией; 'unknown' не показывается в UI
-    const f = d.format || 'A3'
+    // format=null → группируем в «CAD/Скан (формат не определён)» (P5: честный формат, без подмены)
+    const f = d.format || 'CAD/Скан (формат не определён)'
     formatMap.set(f, (formatMap.get(f) ?? 0) + 1)
   }
   const documentsByFormat = Array.from(formatMap.entries())

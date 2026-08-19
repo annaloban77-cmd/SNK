@@ -41,7 +41,7 @@ model Document {
   originalName  String
   mimeType      String
   size          Int      // в байтах
-  format        String   // A4 | A3 | A2 | A1 | A0 | unknown
+  format        String?  // A4 | A3 | A2 | A1 | A0 | null (если не определён)
   sourceType    String   // "scan" | "pdf" | "dwg" | "dxf" | "cdw" | "sldprt" | "sldasm" | "slddrw" | "spw"
   status        String   @default("new") // new | processing | analyzed | failed
   filePath      String   // путь к сохраненному файлу (uploads/)

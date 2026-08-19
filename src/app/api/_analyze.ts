@@ -4,10 +4,11 @@ import { db } from '@/lib/db'
 import { logAudit } from '@/lib/audit'
 import { mapIssue, parseStamp } from './_map'
 import { llmSemanticCheck, type ExtractedStamp } from '@/lib/zai'
-import { runDeterministicRules, toStampFields, fromLlmIssues, cadNoStampFinding, isStampEmpty, type RuleCheckResult } from '@/lib/rules'
+import { runDeterministicRules, toStampFields, fromLlmIssues, cadNoStampFinding, isStampEmpty, mkIssue, type RuleCheckResult } from '@/lib/rules'
 import { extractStamp } from '@/lib/ocr/stamp-ocr'
 import { analyzeGeometry } from '@/lib/geometry/geometry-checker'
 import { filterFindings } from '@/lib/post-filter'
+import { detectFormatFromImage, detectFormatFromCad } from '@/lib/format-detector'
 import { readFile } from 'fs/promises'
 import { existsSync } from 'fs'
 import sharp from 'sharp'
@@ -25,38 +26,6 @@ function timeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 }
 
 const IMAGE_MIME = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
-
-/**
- * Detect paper format (A0..A4 or "unknown") from image aspect ratio.
- * ratio = width / height
- *   - A4 portrait:   ratio ≈ 0.71 (210/297)
- *   - A3 portrait:   ratio ≈ 0.71 too — indistinguishable without DPI/sheet markers
- *   - A4 landscape:  ratio ≈ 1.41 (297/210)
- *   - A3/A2 landscape: similar landscape ratio
- * We pick a coarse guess based on the ratio ranges defined in the task.
- */
-export async function detectFormatFromImage(
-  filePath: string
-): Promise<string | null> {
-  try {
-    const meta = await sharp(filePath).metadata()
-    if (!meta.width || !meta.height) return null
-    const ratio = meta.width / meta.height
-    if (ratio < 0.75) {
-      // Tall portrait — A4 portrait is most common
-      return 'A4'
-    }
-    if (ratio > 1.4) {
-      // Wide landscape — A3/A2 landscape; default to A3 (most common in shipbuilding)
-      return 'A3'
-    }
-    // 0.75 ≤ ratio ≤ 1.4 — could be A3/A2 portrait or A4 landscape
-    // Default to A3 (most common in shipbuilding)
-    return 'A3'
-  } catch {
-    return null
-  }
-}
 
 export async function fileToImageDataUrl(filePath: string, mimeType: string): Promise<string | null> {
   if (!existsSync(filePath)) return null
@@ -153,9 +122,25 @@ export async function runAnalyzePipeline(
         await logStage(documentId, 'ocr_extract', stamp ? 'success' : 'failed', dur, msg)
         stages.push({ stage: 'ocr_extract', status: stamp ? 'success' : 'failed', durationMs: dur, message: msg })
         if (stamp) {
+          // Честный детектор формата: CAD stamp attributes или null.
+          // НЕ подменяем 'A3' по умолчанию для sldasm/sldprt — формат остаётся null,
+          // если CAD-парсер его не извлёк (P5: честный формат).
+          const cadFormat = detectFormatFromCad({
+            stampAttributes: parsed.stampAttributes,
+            format: stamp.format as string | undefined,
+          })
+          if (cadFormat) {
+            ;(stamp as ExtractedStamp & { format?: string }).format = cadFormat
+          } else {
+            // Явно затираем возможный 'unknown' из CAD-парсера → null
+            ;(stamp as ExtractedStamp & { format?: string }).format = undefined as unknown as string
+          }
           await db.document.update({
             where: { id: documentId },
-            data: { stampJson: JSON.stringify(stamp) },
+            data: {
+              stampJson: JSON.stringify(stamp),
+              format: cadFormat, // null если не определён
+            },
           })
         }
       } catch (e) {
@@ -175,20 +160,23 @@ export async function runAnalyzePipeline(
         await logStage(documentId, 'ocr_extract', stamp ? 'success' : 'failed', dur, msg)
         stages.push({ stage: 'ocr_extract', status: stamp ? 'success' : 'failed', durationMs: dur, message: msg })
         if (stamp) {
-          // Format detector: if OCR didn't return a format, infer from image aspect ratio
-          if (!stamp.format || String(stamp.format).trim() === '') {
+          // Format detector: если OCR не вернул формат, пытаемся определить
+          // по пропорциям изображения с допуском 2%. Возвращает null, если
+          // честно определить нельзя (P5: честный формат, без подмены).
+          if (!stamp.format || String(stamp.format).trim() === '' || String(stamp.format).toLowerCase() === 'unknown') {
             const detected = await detectFormatFromImage(doc.filePath)
             if (detected) {
               ;(stamp as ExtractedStamp & { format?: string }).format = detected
+            } else {
+              ;(stamp as ExtractedStamp & { format?: string }).format = undefined as unknown as string
             }
           }
+          const finalFormat = (stamp.format as string | undefined) || null
           await db.document.update({
             where: { id: documentId },
             data: {
               stampJson: JSON.stringify(stamp),
-              ...(stamp.format && stamp.format !== 'unknown'
-                ? { format: String(stamp.format) }
-                : {}),
+              format: finalFormat, // null если не определён
             },
           })
         }
@@ -247,6 +235,23 @@ export async function runAnalyzePipeline(
           deterministicResults = [cadNoStampFinding()]
         } else {
           deterministicResults = runDeterministicRules(stampFields)
+        }
+        // P5: если формат честно не определён (null) — R-FORMAT-* не запускаются
+        // (нечего проверять), но добавляем информационное замечание low,
+        // призывающее пользователя указать формат в штампе.
+        const fmt = (stampFields.format as string | null) ?? null
+        if (!fmt || fmt.trim() === '' || fmt.toLowerCase() === 'unknown') {
+          const formatInfoIssue = mkIssue(
+            'R-FORMAT-INFO',
+            'Формат листа не определён',
+            'Формат листа не удалось определить ни из штампа, ни по пропорциям изображения. Проверки формата (R-FORMAT-*) пропускаются, пока формат не указан.',
+            'low',
+            'Формат',
+            'Указать формат листа в основной надписи (A0, A1, A2, A3 или A4 по ГОСТ 2.301).',
+            'ГОСТ 2.301-68',
+            ''
+          )
+          deterministicResults.push(formatInfoIssue)
         }
         const dur = Date.now() - rulesStart
         await logStage(documentId, 'rules_check', 'success', dur, `${deterministicResults.length} замечаний`)

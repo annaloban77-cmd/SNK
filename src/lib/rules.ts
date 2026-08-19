@@ -359,7 +359,7 @@ export const DETERMINISTIC_RULES: DeterministicRule[] = [
   },
 ]
 
-function mkIssue(
+export function mkIssue(
   code: string,
   title: string,
   description: string,

@@ -51,7 +51,13 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = {}
   if (status) where.status = status
-  if (format) where.format = format
+  // format=none — специальное значение: документы без определённого формата (format IS NULL)
+  // (P5: честный формат — показываем их как отдельную группу, не подменяем на 'A3')
+  if (format === 'none') {
+    where.format = null
+  } else if (format) {
+    where.format = format
+  }
   if (sourceType) where.sourceType = sourceType
   // projectId=none — special value meaning "documents without a project"
   if (projectId === 'none') {

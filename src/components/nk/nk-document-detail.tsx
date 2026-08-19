@@ -43,6 +43,7 @@ import {
   formatBytes,
   stageLabel,
   stageStatusLabel,
+  SOURCE_TYPE_LABELS,
 } from './nk-format'
 import type { StampFields } from '@/lib/types'
 
@@ -101,9 +102,16 @@ export function DocumentDetail() {
         description={
           doc ? (
             <span className="flex flex-wrap items-center gap-2 text-xs">
-              <Badge variant="outline" className="font-mono">
-                {doc.format}
-              </Badge>
+              {doc.format ? (
+                <Badge variant="outline" className="font-mono">
+                  {doc.format}
+                </Badge>
+              ) : (
+                // format=null → бейдж типа источника вместо формата (P5: честный формат)
+                <Badge variant="outline" className="text-muted-foreground border-dashed">
+                  {SOURCE_TYPE_LABELS[doc.sourceType as keyof typeof SOURCE_TYPE_LABELS] ?? doc.sourceType} · формат не определён
+                </Badge>
+              )}
               <SourceBadge sourceType={doc.sourceType} />
               <DocStatusBadge status={doc.status} />
               {doc.project ? (
