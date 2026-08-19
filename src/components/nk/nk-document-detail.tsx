@@ -14,11 +14,11 @@ import {
   useCheckLog,
   useAnalyzeDocument,
   useRetryDocument,
-  useOrganization,
   downloadReport,
   type CheckLogEntry,
 } from '@/hooks/use-nk-api'
 import { useNKStore } from '@/stores/nk-store'
+import { useCurrentRole } from '@/hooks/use-role'
 import { PageHeader } from './nk-page-header'
 import { EmptyState, ErrorState } from './nk-empty-state'
 import { DocStatusBadge } from './nk-status-badge'
@@ -483,18 +483,13 @@ function DocumentTabs({ docId }: { docId: string }) {
   const issuesQ = useDocumentIssues(docId)
   const logQ = useCheckLog(docId)
   const { data: doc } = useDocument(docId)
-  const orgQ = useOrganization()
+  const { isAdmin, mounted } = useCurrentRole()
 
-  // "Сырые данные" tab is admin-only: visible when organization plan is 'pro'/'enterprise'
-  // or when the URL has ?admin=true (for development/debug).
-  const showRawTab = React.useMemo(() => {
-    if (typeof window !== 'undefined') {
-      const sp = new URLSearchParams(window.location.search)
-      if (sp.get('admin') === 'true') return true
-    }
-    const plan = orgQ.data?.plan
-    return plan === 'enterprise' || plan === 'pro'
-  }, [orgQ.data?.plan])
+  // "Сырые данные" tab is admin-only.
+  // The role is read from cookie `nk-role` (default 'admin' on SSR / first paint).
+  // We use the `mounted` flag to defer the decision until after hydration to
+  // avoid SSR/client mismatch and to ensure the cookie is read on the client.
+  const showRawTab = mounted ? isAdmin : false
 
   return (
     <Tabs defaultValue="issues">

@@ -13,7 +13,9 @@
     "db:migrate": "prisma migrate dev",
     "db:reset": "prisma migrate reset",
     "db:sync": "bun run scripts/db-sync.ts",
-    "db:migrate-formats": "bun run scripts/migrate-formats.ts"
+    "db:migrate-formats": "bun run scripts/migrate-formats.ts",
+    "db:seed-clauses": "bun run scripts/seed-clauses.ts",
+    "db:link": "bun run scripts/db-link.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

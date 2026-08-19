@@ -114,6 +114,21 @@ export function Rules() {
     return () => clearTimeout(t)
   }, [searchBox])
 
+  // Pre-fill the search box when navigating from another view (e.g., GostDialog in IssueCard).
+  // The GostDialog sets sessionStorage['nk:rules:search'] = ruleCode and switches view to 'rules'.
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const preset = window.sessionStorage.getItem('nk:rules:search')
+      if (preset) {
+        setSearchBox(preset)
+        window.sessionStorage.removeItem('nk:rules:search')
+      }
+    } catch {
+      // ignore sessionStorage availability
+    }
+  }, [])
+
   const { data, isLoading, isError, refetch, isFetching } = useRules(filters)
 
   const [selectedRule, setSelectedRule] = React.useState<RuleDto | null>(null)

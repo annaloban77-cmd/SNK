@@ -1027,3 +1027,172 @@ Stage Summary:
 - `src/components/nk/nk-bench.tsx` (заголовок де-жаргонизирован).
 - `src/components/nk/nk-documents.tsx` (1 строка — «Семплы» → «Тестовые
   документы»).
+
+---
+Task ID: p3-data
+Agent: full-stack-developer (Z.ai Code)
+Task: ФАЗА 3 — Data quality (4 элемента: 3.1 seed-clauses top-30 GOSTs, 3.2 db-link, 3.4 GOST modal with clauses, 3.5 admin-only raw data tab)
+
+Work Log:
+
+## Контекст
+- Прочитал worklog.md — понял контекст: Batch 7 завершён, бенчи GREEN, P5-принцип реализован.
+- Изучил существующие файлы: scripts/seed-clauses.ts (~22 стандарта), scripts/db-link.ts,
+  src/components/nk/nk-issue-card.tsx (GostDialog уже есть с clauses), src/components/nk/nk-document-detail.tsx
+  (showRawTab был по orgQ.plan), src/components/nk/nk-role-switcher.tsx (getCurrentRole уже есть),
+  src/components/nk/nk-rules.tsx (readCurrentRole дубликат).
+- Проверил БД: 27 стандартов с префиксом "ГОСТ 2.10x/2.30x/2.31x" + ГОСТ 19281-2014 —
+  все необходимые стандарты присутствуют, но withClausesCount=0 (скрипт не запускался ранее).
+
+## 3.1 — seed-clauses: top-30 GOSTs
+
+### Расширение scripts/seed-clauses.ts
+- Добавил 10 недостающих стандартов ЕСКД с реальными требованиями (5-7 пунктов на каждый):
+  * ГОСТ 2.105-95 (Общие требования к текстовым документам) — 6 пунктов
+  * ГОСТ 2.302-68 (Масштабы) — 4 пункта
+  * ГОСТ 2.303-68 (Линии) — 5 пунктов
+  * ГОСТ 2.304-81 (Шрифты чертёжные) — 5 пунктов
+  * ГОСТ 2.306-68 (Обозначения графические материалов) — 4 пункта
+  * ГОСТ 2.310-68 (Нанесение на чертежах надписей, ТТ и таблиц) — 5 пунктов
+  * ГОСТ 2.311-68 (Изображение резьбы) — 6 пунктов
+  * ГОСТ 2.313-82 (Неразъёмные соединения) — 5 пунктов
+  * ГОСТ 2.314-68 (Маркирование и клеймение) — 5 пунктов
+  * ГОСТ 2.315-68 (Упрощённые изображения крепежа) — 5 пунктов
+- Все 10 стандартов были в БД (ГОСТ 2.105-95, 2.302-68, 2.303-68, 2.304-81, 2.306-68,
+  2.310-68, 2.311-68, 2.313-82, 2.314-68, 2.315-68).
+- Текст пунктов — реальные требования ЕСКД (не lorem ipsum). Например, для ГОСТ 2.302
+  указаны все масштабы 1:1, 1:2, 1:2,5, 1:4...100:1; для ГОСТ 2.303 — все 9 типов линий
+  с толщинами; для ГОСТ 2.311 — обозначения резьбы (М, Tr, G, Rc, B, K).
+- Обновил формат вывода: "✓ ГОСТ 2.104-2006: 5 clauses added" (как в задаче).
+- Добавил сводку по severity в конце (high/medium/low).
+- Заголовок файла: "top-20" → "top-30".
+
+### package.json
+- Добавил два скрипта:
+  * `"db:seed-clauses": "bun run scripts/seed-clauses.ts"`
+  * `"db:link": "bun run scripts/db-link.ts"` (бонусом для удобства).
+- В scripts/db-sync.ts вызов seed-clauses и db-link уже присутствовал (шаг 5 и 6) —
+  оставил без изменений, скрипты продолжают запускаться автоматически.
+
+### Запуск
+- `bun run scripts/seed-clauses.ts` → 30 стандартов, 134 пункта:
+  * high: 48, medium: 59, low: 27
+- `curl -s http://localhost:3000/api/standards/stats` →
+  `withClausesCount: 30` (было 0, стало 30 — ровно top-30 GOSTs).
+- Проверка `/api/standards/{id}/clauses` → 5 пунктов для ГОСТ 2.104-2006.
+
+## 3.2 — db-link: Rule.standardId ↔ Standard.code
+
+### Расширение scripts/db-link.ts
+- Переписал findStandardForRule() с 4 эвристиками (по приоритету):
+  1. `expression.standardCode` → findUnique по точному коду (с fallback startsWith)
+  2. `gostField` содержит "ГОСТ X.XXX" → startsWith по префиксу кода
+     (через новый helper extractGostPrefix() с regex /ГОСТ\s*(\d+(?:\.\d+)*)/)
+  3. `gostField` → search Standard.name contains (со стеммингом)
+  4. `gostField` → search Standard.scope contains (со стеммингом)
+- Добавил searchStems() — простой русско-английский стеммер:
+  "Покрытие" → ["Покрытие", "Покрыти", "Покрытиеи", "Покрытиеа"]
+  (ловит и "Покрытие" (ед.ч.) и "Покрытия" (мн.ч.)).
+- Добавил per-rule вывод: "✓ R-PAINT-001 → ГОСТ 9.032-74" для каждой связи.
+- Для несопоставленных правил — явное объяснение:
+  "✗ R-FAST-014 — стандарт не найден (gostField=\"Подшипники\")".
+- Убрал неиспользуемую эвристику R-FAST → ГОСТ 8338 (этого ГОСТ нет в БД).
+- Добавил финальную сводку: "✅ db-link завершён: 455/461 правил связаны".
+
+### Запуск
+- `bun run scripts/db-link.ts` → 1 новая связь:
+  * `✓ R-PAINT-001 → ГОСТ 9.032-74` (раньше было 0, теперь 455/461).
+- 6 не сопоставленных (R-GEOM-001 "Геометрия", R-FAST-014/016/017/018 "Подшипники",
+  R-TEST-001 тест) — для них стандартов в БД действительно нет.
+
+## 3.4 — "Прочитать ГОСТ" modal with clauses
+
+### src/components/nk/nk-issue-card.tsx — правки в GostDialog/StandardDetailBlock
+- Заменил "Открыть на ЦНТД" → "Открыть оригинал" (теперь совпадает с
+  nk-knowledge-base.tsx, который уже использовал этот текст).
+- В блоке "Правило, породившее замечание" заменил Badge на кликабельную
+  кнопку: при клике вызывается navigateToRule(rule.code) → закрывает диалог
+  и переключает view на 'rules', а в sessionStorage записывается
+  'nk:rules:search' = ruleCode — это маркер для nk-rules.tsx.
+- В списке "Связанные правила" каждый rule.code теперь тоже кликабельная
+  кнопка (тот же onRuleClick). Бейджи заменены на кнопки с hover-эффектом.
+- Добавил helper navigateToRule() и подсказку: "Нажмите на код правила,
+  чтобы открыть его в разделе «Правила»".
+
+### src/components/nk/nk-rules.tsx — consumer для навигации
+- Добавил useEffect, который при mount читает sessionStorage['nk:rules:search']
+  и подставляет значение в searchBox (если маркер есть — он удаляется).
+  Пользователь из GostDialog попадает на страницу «Правила» с уже
+  отфильтрованным списком по коду правила.
+
+### Поведение модала «Прочитать ГОСТ»
+- Показывает StandardClause как список (number, title, text, severity badge).
+- Если есть sourceUrl — показывает кнопку «Открыть оригинал».
+- Если есть rule.code — кликабельная кнопка для перехода в раздел правил.
+- Если есть related-rules — список с кликабельными кодами.
+
+## 3.5 — "Сырые данные" — admin only
+
+### Новый файл: src/hooks/use-role.ts
+- Экспортирует:
+  * `NKRole = 'admin' | 'normocontroller' | 'engineer' | 'viewer'`
+  * `readCurrentRole(): NKRole` — синхронное чтение из cookie `nk-role`.
+  * `useCurrentRole(): { role, isAdmin, isNormocontroller, isEngineer, isViewer, mounted }`
+    — React-хук с mount-флагом (чтобы избежать SSR-mismatch).
+- SSR-safe: на сервере возвращает 'admin' (по умолчанию).
+- Использует тот же механизм, что и nk-role-switcher.tsx (cookie `nk-role`).
+
+### src/components/nk/nk-document-detail.tsx — правки
+- Убрал старую логику showRawTab, основанную на orgQ.plan:
+  * было: показывать если plan === 'enterprise' || 'pro' || ?admin=true
+  * стало: показывать только если role === 'admin'
+- Использует хук `useCurrentRole()` с mount-флагом:
+  `const showRawTab = mounted ? isAdmin : false`
+  (mount-флаг нужен, чтобы cookie `nk-role` был прочитан на клиенте
+  и не было SSR/CSR-несоответствий).
+- Для non-admin ролей таб «Сырые данные» полностью скрыт (не просто
+  disabled — нет ни триггера, ни контента).
+- Убрал неиспользуемый импорт `useOrganization`.
+
+## Приёмка
+- `bun run lint` → exit 0 (без ошибок и предупреждений).
+- `dev.log` — компиляция прошла успешно ("✓ Compiled in 281ms" и т.д.),
+  ошибок и предупреждений нет.
+- API:
+  * `GET /api/standards/stats` → withClausesCount: 30 (было 0)
+  * `GET /api/standards/{id}/clauses` → 5 пунктов для ГОСТ 2.104
+  * `GET /api/standards?search=ГОСТ+2.104` → возвращает ГОСТ 2.104-2006 с clausesCount=5
+
+Stage Summary:
+- ✅ 3.1 — seed-clauses.ts расширен с 22 до 30 стандартов ЕСКД (134 пункта всего).
+  Все 10 недостающих стандартов добавлены с реальными требованиями.
+  db:seed-clauses добавлен в package.json. withClausesCount: 0 → 30.
+- ✅ 3.2 — db-link.ts улучшен: 4 эвристики сопоставления, русско-английский
+  стеммер (Покрытие/Покрытия), per-rule вывод "✓ R-FORMAT-001 → ГОСТ 2.301-68".
+  Связность правил: 454/461 → 455/461 (+1: R-PAINT-001 → ГОСТ 9.032-74).
+- ✅ 3.4 — GostDialog в nk-issue-card.tsx:
+  * "Открыть на ЦНТД" → "Открыть оригинал"
+  * rule.code в блоке "Правило, породившее замечание" — кликабельная кнопка
+  * related-rules — каждый код кликабельный
+  * Переход в раздел «Правила» с прехай-заполнением поиска (sessionStorage).
+- ✅ 3.5 — src/hooks/use-role.ts создан (readCurrentRole + useCurrentRole).
+  nk-document-detail.tsx: «Сырые данные» таб виден только admin-роли.
+  Использует mount-флаг для SSR-безопасности.
+- ✅ Lint проходит (exit 0). Dev-сервер компилируется без ошибок.
+- ✅ API endpoints работают корректно.
+
+Файлы изменены:
+- scripts/seed-clauses.ts (+355 строк: 10 новых стандартов × ~35 строк каждый)
+- scripts/db-link.ts (полная переработка логики сопоставления, +110 строк)
+- package.json (+2 скрипта: db:seed-clauses, db:link)
+- src/hooks/use-role.ts (новый файл, 75 строк)
+- src/components/nk/nk-issue-card.tsx (+navigateToRule, onRuleClick, +useNKStore,
+  кнопки вместо Badge, текст «Открыть оригинал»)
+- src/components/nk/nk-rules.tsx (+useEffect для sessionStorage nk:rules:search)
+- src/components/nk/nk-document-detail.tsx (showRawTab теперь на useCurrentRole)
+
+Достижение по StandardClause:
+- Было: withClausesCount=0 (0 пунктов в БД)
+- Стало: withClausesCount=30, 134 пункта total (48 high + 59 medium + 27 low)
+- Покрытие: top-30 GOSTs (19 ЕСКД 2.104-2.316 + 1 материал 19281 + 10 доп.
+  стандартов: 2.109, 2.201, 2.103, 25346, 25347, 2789, 5264, 14771, 9.032, 15150)

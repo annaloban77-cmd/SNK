@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useNKStore } from '@/stores/nk-store'
 import { SeverityBadge } from './nk-severity-badge'
 import { IssueStatusBadge } from './nk-status-badge'
 import {
@@ -270,6 +271,27 @@ function gostSearchToken(gostRef: string | null | undefined): string {
   return head
 }
 
+/**
+ * Navigate to the Rules view with the given rule code pre-filled in the
+ * search box. Used by the GostDialog's rule code button and the related-rules
+ * list — both close the dialog first and then call setView('rules').
+ */
+function navigateToRule(
+  ruleCode: string,
+  closeDialog: () => void,
+  setView: (v: 'rules') => void,
+) {
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage.setItem('nk:rules:search', ruleCode)
+    } catch {
+      // ignore sessionStorage availability
+    }
+  }
+  closeDialog()
+  setView('rules')
+}
+
 function GostDialog({
   open,
   onOpenChange,
@@ -287,10 +309,15 @@ function GostDialog({
     search: searchToken || undefined,
     pageSize: 5,
   })
+  const setView = useNKStore((s) => s.setView)
 
   // Pick the first matching standard
   const matchedStandard: StandardDto | null =
     (standardsQ.data?.items ?? [])[0] ?? null
+
+  function onRuleClick(ruleCode: string) {
+    navigateToRule(ruleCode, () => onOpenChange(false), setView)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -315,11 +342,19 @@ function GostDialog({
               Правило, породившее замечание
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="font-mono">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-0.5 font-mono text-xs transition-colors hover:bg-accent"
+                onClick={() => onRuleClick(rule.code)}
+                title="Перейти к разделу правил"
+              >
                 {rule.code}
-              </Badge>
+              </button>
               <span className="text-sm font-medium">{rule.name}</span>
             </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Нажмите на код правила, чтобы открыть его в разделе «Правила».
+            </p>
           </div>
         ) : null}
 
@@ -330,7 +365,10 @@ function GostDialog({
         ) : standardsQ.isLoading ? (
           <Skeleton className="h-32 w-full" />
         ) : matchedStandard ? (
-          <StandardDetailBlock standard={matchedStandard} />
+          <StandardDetailBlock
+            standard={matchedStandard}
+            onOpenChange={onOpenChange}
+          />
         ) : (
           <div className="rounded-md border border-amber-200 bg-amber-50/40 p-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
             ГОСТ не найден в локальной базе знаний. Попробуйте обновить
@@ -342,11 +380,25 @@ function GostDialog({
   )
 }
 
-function StandardDetailBlock({ standard }: { standard: StandardDto }) {
+function StandardDetailBlock({
+  standard,
+  onOpenChange,
+}: {
+  standard: StandardDto
+  onOpenChange: (v: boolean) => void
+}) {
   const { data, isLoading } = useStandard(standard.id)
   const clausesQ = useStandardClauses(standard.id)
   const [clausesOpen, setClausesOpen] = React.useState(true)
   const linkedRules: RuleDto[] = data?.rules ?? []
+  const setView = useNKStore((s) => s.setView)
+
+  function onRuleClick(ruleCode: string) {
+    // Close the GostDialog and navigate to the Rules view.
+    // A transient marker in sessionStorage lets the Rules view pre-fill
+    // the search box so the user lands on the right rule.
+    navigateToRule(ruleCode, () => onOpenChange(false), setView)
+  }
 
   return (
     <div className="space-y-3 text-sm">
@@ -400,7 +452,7 @@ function StandardDetailBlock({ standard }: { standard: StandardDto }) {
         <div>
           <Button asChild variant="outline" size="sm">
             <a href={standard.sourceUrl} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="size-4" /> Открыть на ЦНТД
+              <ExternalLink className="size-4" /> Открыть оригинал
             </a>
           </Button>
         </div>
@@ -466,11 +518,16 @@ function StandardDetailBlock({ standard }: { standard: StandardDto }) {
             {linkedRules.map((r: RuleDto) => (
               <li
                 key={r.id}
-                className="flex items-start gap-2 rounded-md border p-2"
+                className="flex items-start gap-2 rounded-md border p-2 transition-colors hover:bg-accent/50"
               >
-                <Badge variant="outline" className="font-mono text-xs">
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 rounded-md border bg-card px-1.5 py-0.5 font-mono text-xs transition-colors hover:bg-accent"
+                  onClick={() => onRuleClick(r.code)}
+                  title="Перейти к разделу правил"
+                >
                   {r.code}
-                </Badge>
+                </button>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{r.name}</div>
                   <div className="line-clamp-2 text-xs text-muted-foreground">
