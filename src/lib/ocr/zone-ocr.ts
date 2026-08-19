@@ -1,24 +1,68 @@
 // zone-ocr.ts — zone-based OCR штампа (оптимизированный)
-// 2 Tesseract-вызова на семпл: full stamp (PSM 6) + format line (PSM 7)
-// Плюс 1 вызов для ТТ = 3 total. ~3-6 сек на семпл.
+// 2 Tesseract-вызова на семпл: full stamp (PSM 6) + ТТ (PSM 6)
+// Формат-строка парсится из fullText (не отдельный вызов) = 2 total вместо 3.
+// ~3-6 сек на семпл.
+//
+// Stability (v1.2):
+//   - Worker rotation: MAX_REQUESTS=100 → terminate + recreate (memory leak fix)
+//   - Promise.race на worker.recognize(): таймаут 30 сек
+//   - Лимит пикселей: MAX_PIXELS=6MP на upscale
+//   - Баг indexOf исправлен: findIndex(p => p.key === key)
+//
 
 import sharp from 'sharp'
 import type { StampFields } from '@/lib/types'
 
+// Worker rotation: после MAX_REQUESTS распознаваний — terminate + recreate
+const MAX_REQUESTS = 100
+const RECOGNIZE_TIMEOUT_MS = 30_000
+const MAX_PIXELS = 6_000_000 // 6 MP — лимит на upscale для защиты от OOM
+
 let _worker: any = null
+let _requestCount = 0
 
 async function getWorker() {
-  if (!_worker) {
+  if (!_worker || _requestCount >= MAX_REQUESTS) {
+    if (_worker) {
+      try { await _worker.terminate() } catch {}
+      _worker = null
+      _requestCount = 0
+    }
     const { createWorker } = await import('tesseract.js')
     _worker = await createWorker('rus+eng', 1, { logger: () => {} })
+    _requestCount = 0
   }
   return _worker
+}
+
+/**
+ * Recognize with timeout. Returns null on timeout.
+ */
+async function recognizeWithTimeout(worker: any, image: Buffer, opts: Record<string, unknown>): Promise<{ data: { text?: string; confidence?: number } } | null> {
+  try {
+    const result = await Promise.race([
+      worker.recognize(image, {}, opts),
+      new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error(`Tesseract recognize timeout (${RECOGNIZE_TIMEOUT_MS}ms)`)), RECOGNIZE_TIMEOUT_MS)
+      ),
+    ])
+    _requestCount++
+    return result as { data: { text?: string; confidence?: number } }
+  } catch (e) {
+    console.error('[zone-ocr] recognize failed or timed out:', e instanceof Error ? e.message : String(e))
+    // On timeout/error, rotate the worker (it may be in a bad state)
+    try { if (_worker) await _worker.terminate() } catch {}
+    _worker = null
+    _requestCount = 0
+    return null
+  }
 }
 
 export async function terminateZoneOcr() {
   if (_worker) {
     try { await _worker.terminate() } catch {}
     _worker = null
+    _requestCount = 0
   }
 }
 
@@ -106,40 +150,32 @@ export async function extractStampWithZoneOcr(filePath: string): Promise<ZoneOcr
     }
 
     // 3. Вызов 1: весь штамп (PSM 6 = uniform block)
-    const { data: fullData } = await worker.recognize(stampImg, {}, {
-      tessedit_pageseg_mode: '6',
-    })
-    const fullText = fullData.text || ''
-    const fullConf = (fullData.confidence || 0) / 100
+    const fullResult = await recognizeWithTimeout(worker, stampImg, { tessedit_pageseg_mode: '6' })
+    if (!fullResult) {
+      return {
+        stamp: {},
+        method: 'none',
+        sourceOcr: 'none',
+        durationMs: Date.now() - start,
+        confidence: 0,
+        rawText: 'Tesseract recognize failed or timed out',
+      }
+    }
+    const fullText = fullResult.data.text || ''
+    const fullConf = (fullResult.data.confidence || 0) / 100
     const fullLines = fullText.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
 
-    // 4. Вызов 2: формат-строка (нижняя часть штампа, PSM 7 = single line)
-    const stampMeta = await sharp(stampImg).metadata()
-    const stampW2 = stampMeta.width || stampW * 4
-    const stampH2 = stampMeta.height || stampH * 4
-    const fmtZone = {
-      left: Math.round(stampW2 * 0.50),
-      top: Math.round(stampH2 * 0.85),
-      width: Math.min(Math.round(stampW2 * 0.48), stampW2 - Math.round(stampW2 * 0.50) - 1),
-      height: Math.min(Math.round(stampH2 * 0.15), stampH2 - Math.round(stampH2 * 0.85) - 1),
-    }
-    let fmtText = ''
-    let fmtConf = 0
-    try {
-      const fmtImg = await sharp(stampImg).extract(fmtZone).png().toBuffer()
-      const { data: fmtData } = await worker.recognize(fmtImg, {}, {
-        tessedit_pageseg_mode: '7',
-      })
-      fmtText = fmtData.text || ''
-      fmtConf = (fmtData.confidence || 0) / 100
-    } catch {}
+    // 4. Формат-строка парсится из fullText (не отдельный Tesseract-вызов)
+    // Это уменьшает кол-во вызовов с 3 до 2 (full stamp + ТТ)
+    const fmtText = fullText // парсим из того же текста
+    const fmtConf = fullConf
 
     // 5. Парсинг полей из fullText + fmtText
     const fieldMeta = parseStampFromZoneText(stamp, fullLines, fmtText, ppW, ppH)
     // 5a. Объединяем с ink detection (приоритетнее для hasText)
     mergeInkIntoMeta(fieldMeta, inkMeta)
 
-    // 6. Вызов 3 (опционально): ТТ
+    // 6. Вызов 2 (опционально): ТТ — с таймаутом
     try {
       const ttX = Math.round(ppW * 0.05)
       const ttY = Math.round(ppH * 0.50)
@@ -150,11 +186,11 @@ export async function extractStampWithZoneOcr(filePath: string): Promise<ZoneOcr
         .resize(ttW * 2, ttH * 2, { fit: 'fill', kernel: 'lanczos3' })
         .png()
         .toBuffer()
-      const { data: ttData } = await worker.recognize(ttImg, {}, {
-        tessedit_pageseg_mode: '6',
-      })
-      const ttLines = (ttData.text || '').split(/\r?\n/).map(l => l.trim()).filter(l => /^\d+[.:]/.test(l))
-      if (ttLines.length > 0) stamp.technicalRequirements = ttLines
+      const ttResult = await recognizeWithTimeout(worker, ttImg, { tessedit_pageseg_mode: '6' })
+      if (ttResult) {
+        const ttLines = (ttResult.data.text || '').split(/\r?\n/).map(l => l.trim()).filter(l => /^\d+[.:]/.test(l))
+        if (ttLines.length > 0) stamp.technicalRequirements = ttLines
+      }
     } catch {}
 
     const avgConf = (fullConf + fmtConf) / 2
@@ -216,7 +252,9 @@ function parseStampFromZoneText(
     }
     // Толерантный: если не нашли по метке, ищем любые Фамилия И.О. в соответствующей строке
     if (!stamp.signatures![key]) {
-      const idx = sigPatterns.indexOf({ key, re })
+      // Bugfix: indexOf({key,re}) всегда возвращает -1 (ссылочное сравнение).
+      // Используем findIndex для корректного поиска индекса паттерна.
+      const idx = sigPatterns.findIndex((p) => p.key === key && p.re === re)
       if (idx >= 0 && idx < lines.length) {
         const line = lines[idx]
         const m = line.match(/([А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.?)/)

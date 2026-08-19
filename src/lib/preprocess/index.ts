@@ -1,8 +1,19 @@
 // preprocess.ts — препроцессинг сканов для OCR
 // deskew (по проекциям), бинаризация (Otsu), денуаз, DPI-калибровка
 // Без OpenCV — только sharp + вычисления на raw buffer
+//
+// Stability (v1.2):
+//   - Проверка размера файла: >50MB → error (не crash)
+//   - Валидация: sharp.metadata() в try-catch
+//   - Таймаут 10с на detectSkewAngle
+//   - Обработка ошибок с понятными сообщениями
+//
 
 import sharp from 'sharp'
+import { statSync } from 'fs'
+
+const MAX_PREPROCESS_SIZE = 50 * 1024 * 1024 // 50 MB
+const DESKEW_TIMEOUT_MS = 10_000
 
 export interface PreprocessResult {
   processed: Buffer // обработанное PNG-изображение
@@ -16,16 +27,45 @@ export interface PreprocessResult {
 
 // Главный метод — полная预处理ка
 export async function preprocessScan(filePath: string): Promise<PreprocessResult> {
-  const img = sharp(filePath)
-  const meta = await img.metadata()
+  // 1. Проверка размера файла
+  let stat
+  try {
+    stat = statSync(filePath)
+  } catch {
+    throw new Error(`Файл недоступен: ${filePath}`)
+  }
+  if (stat.size > MAX_PREPROCESS_SIZE) {
+    throw new Error(`Файл слишком большой: ${(stat.size / 1024 / 1024).toFixed(1)} МБ (макс. ${MAX_PREPROCESS_SIZE / 1024 / 1024} МБ)`)
+  }
+
+  // 2. Чтение метаданных с обработкой ошибок
+  let img: sharp.Sharp
+  let meta: sharp.Metadata
+  try {
+    img = sharp(filePath)
+    meta = await img.metadata()
+  } catch (e) {
+    throw new Error(`Не удалось прочитать изображение: ${e instanceof Error ? e.message : String(e)}. Возможно, файл повреждён.`)
+  }
   const origW = meta.width || 1000
   const origH = meta.height || 1414
 
   // 1. Конвертация в grayscale
   let processed = img.grayscale()
 
-  // 2. Deskew — определяем угол перекоса по проекциям
-  const skewAngle = await detectSkewAngle(filePath, origW, origH)
+  // 2. Deskew — определяем угол перекоса по проекциям (с таймаутом 10с)
+  let skewAngle = 0
+  try {
+    skewAngle = await Promise.race([
+      detectSkewAngle(filePath, origW, origH),
+      new Promise<number>((_, reject) =>
+        setTimeout(() => reject(new Error(`detectSkewAngle timeout (${DESKEW_TIMEOUT_MS}ms)`)), DESKEW_TIMEOUT_MS)
+      ),
+    ])
+  } catch (e) {
+    console.warn('[preprocess] deskew failed, skipping:', e instanceof Error ? e.message : String(e))
+    skewAngle = 0
+  }
   if (Math.abs(skewAngle) > 0.2) {
     processed = processed.rotate(skewAngle, { background: { r: 255, g: 255, b: 255 } })
   }

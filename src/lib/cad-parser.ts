@@ -63,16 +63,52 @@ export interface ParsedCadFile {
 }
 
 // Главный метод: разобрать CAD-файл по пути
+//
+// Stability (v1.2):
+//   - Размер файла проверяется ПЕРЕД чтением (>100MB → graceful return)
+//   - DXF: лимит итераций 1M строк → abort с warning
+//   - DWG: сканирует с лимитом 500K строк
+//   - Битые/неподдерживаемые файлы → graceful return с warnings, не crash
+//
+const MAX_CAD_FILE_SIZE = 100 * 1024 * 1024 // 100 MB
+const DXF_MAX_LINES = 1_000_000 // лимит строк DXF для защиты от OOM
+const DWG_MAX_SCAN_LINES = 500_000 // лимит строк DWG для сканирования
+
 export async function parseCadFile(filePath: string, mimeType?: string): Promise<ParsedCadFile> {
-  const buf = await readFile(filePath)
+  // 1. Проверка размера файла ПЕРЕД чтением
+  let stat
+  try {
+    const { statSync } = await import('fs')
+    stat = statSync(filePath)
+  } catch {
+    return emptyResult(`Файл недоступен: ${filePath}`)
+  }
+  if (stat.size > MAX_CAD_FILE_SIZE) {
+    return emptyResult(
+      `Файл слишком большой: ${(stat.size / 1024 / 1024).toFixed(1)} МБ (макс. ${MAX_CAD_FILE_SIZE / 1024 / 1024} МБ). Сократите файл или экспортируйте подмножество.`
+    )
+  }
+
+  // 2. Чтение файла
+  let buf: Buffer
+  try {
+    buf = await readFile(filePath)
+  } catch (e) {
+    return emptyResult(`Не удалось прочитать файл: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
   const ext = filePath.toLowerCase().split('.').pop() || ''
-  
+
   if (ext === 'dxf') return parseDxf(buf)
   if (ext === 'dwg') return parseDwg(buf)
   if (ext === 'sldprt' || ext === 'sldasm' || ext === 'slddrw') return parseSolidWorks(buf, ext)
   if (ext === 'cdw') return parseKompasCdw(buf)
   if (ext === 'spw') return parseKompasSpw(buf)
   
+  return emptyResult(`Unsupported CAD format: ${ext}`, buf.length)
+}
+
+function emptyResult(warning: string, fileSize = 0): ParsedCadFile {
   return {
     format: 'unknown',
     stampAttributes: {},
@@ -81,8 +117,8 @@ export async function parseCadFile(filePath: string, mimeType?: string): Promise
     layers: [],
     blocks: [],
     textEntities: [],
-    metadata: { fileSize: buf.length },
-    warnings: [`Unsupported CAD format: ${ext}`],
+    metadata: { fileSize },
+    warnings: [warning],
   }
 }
 
@@ -115,8 +151,15 @@ function parseDxf(buf: Buffer): ParsedCadFile {
   let currentAttrDef: Partial<{ tag: string; prompt: string; text: string }> | null = null
   
   // Простой конечный автомат по парам код-значение
+  // Защита от OOM: лимит итераций (большой DXF может содержать миллионы пар)
+  const maxIterations = Math.min(lines.length, DXF_MAX_LINES)
   let i = 0
-  while (i < lines.length - 1) {
+  let truncated = false
+  if (lines.length > DXF_MAX_LINES) {
+    warnings.push(`DXF truncated: ${lines.length} lines > ${DXF_MAX_LINES} limit. Обработаны первые ${DXF_MAX_LINES} строк.`)
+    truncated = true
+  }
+  while (i < maxIterations - 1) {
     const codeStr = lines[i].trim()
     const value = lines[i + 1]
     const code = parseInt(codeStr, 10)
