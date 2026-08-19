@@ -788,10 +788,10 @@ export interface BenchStatus {
     durationMs: number | null; startedAt: string; finishedAt: string | null
     findingsCount: number
   } | null
-  runningRun: { id: string; version: string; startedAt: string } | null
+  runningRun: { id: string; version: string; startedAt: string; progress: { processed: number; total: number } | null } | null
   samples: { total: number; correct: number; withErrors: number }
   history: {
-    id: string; version: string; benchStatus: string | null
+    id: string; version: string; benchStatus: string | null; status: string
     recall: number | null; precision: number | null; recallHigh: number | null
     passedSamples: number; failedSamples: number; totalSamples: number
     durationMs: number | null; startedAt: string

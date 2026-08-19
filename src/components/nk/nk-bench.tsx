@@ -29,6 +29,17 @@ function StatusBadge({ status }: { status: string | null }) {
   return <Badge variant="outline" className={m.className}>{m.label}</Badge>
 }
 
+function RunStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    completed: { label: 'Завершён', className: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+    aborted: { label: 'Прерван (watchdog)', className: 'bg-red-100 text-red-700 border-red-300' },
+    failed: { label: 'Ошибка', className: 'bg-red-100 text-red-700 border-red-300' },
+    running: { label: 'Идёт...', className: 'bg-amber-100 text-amber-700 border-amber-300' },
+  }
+  const m = map[status] || { label: status, className: '' }
+  return <Badge variant="outline" className={m.className}>{m.label}</Badge>
+}
+
 function MetricCard({ label, value, target, icon, tone = 'slate' }: {
   label: string; value: number | null; target?: string; icon: React.ReactNode; tone?: string
 }) {
@@ -76,6 +87,13 @@ export function Bench() {
   const samples = status?.samples
   const history = status?.history || []
 
+  // Прогресс текущего прогона: 0..100
+  const progressPct = running?.progress
+    ? running.progress.total > 0
+      ? Math.min(100, Math.round((running.progress.processed / running.progress.total) * 100))
+      : 0
+    : 0
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -83,7 +101,7 @@ export function Bench() {
         description="Предохранитель релиза. Тест на тестовых документах с известными ошибками."
         actions={
           <Button
-            onClick={() => runBench.mutate({ runLlm: false, version: `bench-${new Date().toISOString().slice(0, 19)}` })}
+            onClick={() => runBench.mutate({ runLlm: false })}
             disabled={runBench.isPending || !!running}
           >
             <Play className="size-4 mr-2" />
@@ -107,17 +125,27 @@ export function Bench() {
         </CardContent>
       </Card>
 
-      {/* Running indicator */}
+      {/* Running indicator with live progress */}
       {running && (
         <Card className="border-amber-300 bg-amber-50/50">
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="size-3 rounded-full bg-amber-500 animate-pulse" />
-            <div className="text-sm">
-              <span className="font-medium">Идёт тестирование...</span>
-              <span className="text-muted-foreground ml-2">
-                {format(new Date(running.startedAt), 'dd.MM.yyyy HH:mm', { locale: ru })}
-              </span>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="size-3 rounded-full bg-amber-500 animate-pulse" />
+              <div className="text-sm flex-1">
+                <span className="font-medium">Идёт тестирование... {progressPct}%</span>
+                {running.progress && (
+                  <span className="text-muted-foreground ml-2">
+                    ({running.progress.processed}/{running.progress.total})
+                  </span>
+                )}
+                <span className="text-muted-foreground ml-2">
+                  {format(new Date(running.startedAt), 'dd.MM.yyyy HH:mm', { locale: ru })}
+                </span>
+              </div>
             </div>
+            {running.progress && (
+              <Progress value={progressPct} className="h-2" />
+            )}
           </CardContent>
         </Card>
       )}
@@ -217,8 +245,14 @@ export function Bench() {
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => setSelectedRunId(h.id)}
                         >
-                          <TableCell className="text-xs font-mono">{h.version.slice(0, 20)}</TableCell>
-                          <TableCell><StatusBadge status={h.benchStatus} /></TableCell>
+                          <TableCell className="text-xs font-mono">{h.version.slice(0, 24)}</TableCell>
+                          <TableCell>
+                            {h.status === 'completed' ? (
+                              <StatusBadge status={h.benchStatus} />
+                            ) : (
+                              <RunStatusBadge status={h.status} />
+                            )}
+                          </TableCell>
                           <TableCell className="text-xs tabular-nums">{h.recall !== null ? `${Math.round(h.recall * 100)}%` : '—'}</TableCell>
                           <TableCell className="text-xs tabular-nums">{h.precision !== null ? `${Math.round(h.precision * 100)}%` : '—'}</TableCell>
                           <TableCell className="text-xs tabular-nums">{h.passedSamples}/{h.totalSamples}</TableCell>

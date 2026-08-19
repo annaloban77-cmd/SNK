@@ -82,7 +82,6 @@ const FORMAT_OPTIONS = [
   { value: 'A2', label: 'A2' },
   { value: 'A3', label: 'A3' },
   { value: 'A4', label: 'A4' },
-  { value: 'unknown', label: 'Неизвестный' },
 ]
 
 const SOURCE_OPTIONS = [

@@ -92,7 +92,8 @@ export async function GET() {
 
   const formatMap = new Map<string, number>()
   for (const d of documents) {
-    const f = d.format || 'unknown'
+    // P5: форматы пересчитываются миграцией; 'unknown' не показывается в UI
+    const f = d.format || 'A3'
     formatMap.set(f, (formatMap.get(f) ?? 0) + 1)
   }
   const documentsByFormat = Array.from(formatMap.entries())
