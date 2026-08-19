@@ -1,19 +1,65 @@
-// config-loader.ts — чтение config.yaml с дефолтами
-// Приложение читает при старте, админ-консоль пишет при apply
-
-import { readFileSync, existsSync, writeFileSync } from 'fs'
+// config-loader.ts — чтение config.yaml с дефолтами и Zod-валидацией.
+// Приложение читает при старте, админ-консоль пишет при apply.
+//
+// Безопасность (v1.2):
+//   - Zod-схема валидирует все поля при записи (saveConfig)
+//   - Атомарная запись: пишем в .tmp, затем rename (нет частичных файлов)
+//   - Аудит: каждое сохранение пишется в AuditLog
+//   - Невалидный конфиг отклоняется с понятной ошибкой
+//
+import { readFileSync, existsSync, writeFileSync, renameSync } from 'fs'
+import { rename as fsRename } from 'fs/promises'
 import path from 'path'
+import { z } from 'zod'
 
-export interface NKConfig {
-  server: { port_main: number; port_admin: number; host: string }
-  database: { type: string; path: string }
-  ocr: { engine: string; paddleocr_url: string; tesseract_lang: string; confidence_cutoff: number; dpi_target: number; downscale_max: number; zone_crop: boolean }
-  models: { llm_mode: string; ollama_url: string; ollama_model: string; local_only: boolean; vlm_model: string; llm_model: string }
-  bench: { auto_run: boolean; release_gate: boolean }
-  rules: { categories_enabled: string[]; industry_module: string }
-  uploads: { max_size_mb: number; allowed_types: string[] }
-  organization: { name: string; industry: string; admin_password: string }
-}
+// ===== Zod-схема конфигурации =====
+const ConfigSchema = z.object({
+  server: z.object({
+    port_main: z.number().int().min(1).max(65535),
+    port_admin: z.number().int().min(1).max(65535),
+    host: z.string().regex(/^[a-zA-Z0-9.\-]+$/, 'host должен быть IP или доменом'),
+  }),
+  database: z.object({
+    type: z.enum(['sqlite']),
+    path: z.string().regex(/^db\/[a-zA-Z0-9_-]+\.db$/, 'database.path должен быть вида db/name.db'),
+  }),
+  ocr: z.object({
+    engine: z.enum(['paddleocr', 'tesseract']),
+    paddleocr_url: z.string().url().or(z.literal('')),
+    tesseract_lang: z.string().min(1),
+    confidence_cutoff: z.number().min(0).max(1),
+    dpi_target: z.number().int().min(72).max(600),
+    downscale_max: z.number().int().min(500).max(4000),
+    zone_crop: z.boolean(),
+  }),
+  models: z.object({
+    llm_mode: z.enum(['cloud_vlm', 'local_ollama', 'off']),
+    ollama_url: z.string().url().or(z.literal('')),
+    ollama_model: z.string(),
+    local_only: z.boolean(),
+    vlm_model: z.string().min(1),
+    llm_model: z.string().min(1),
+  }),
+  bench: z.object({
+    auto_run: z.boolean(),
+    release_gate: z.boolean(),
+  }),
+  rules: z.object({
+    categories_enabled: z.array(z.string()),
+    industry_module: z.string(),
+  }),
+  uploads: z.object({
+    max_size_mb: z.number().int().min(1).max(500),
+    allowed_types: z.array(z.string()),
+  }),
+  organization: z.object({
+    name: z.string(),
+    industry: z.string(),
+    admin_password: z.string().min(8).optional().or(z.literal('')),
+  }),
+})
+
+export type NKConfig = z.infer<typeof ConfigSchema>
 
 const DEFAULT_CONFIG: NKConfig = {
   server: { port_main: 1111, port_admin: 3333, host: '0.0.0.0' },
@@ -39,19 +85,52 @@ export function getConfig(): NKConfig {
 
   try {
     const raw = readFileSync(configPath, 'utf-8')
-    _config = { ...DEFAULT_CONFIG, ...parseSimpleYaml(raw) } as NKConfig
+    const parsed = { ...DEFAULT_CONFIG, ...parseSimpleYaml(raw) }
+    // Валидируем при чтении тоже (защита от ручной правки config.yaml с ошибками)
+    const result = ConfigSchema.safeParse(parsed)
+    if (result.success) {
+      _config = result.data
+    } else {
+      console.error('[config-loader] Невалидный config.yaml, используем дефолт:', result.error.issues)
+      _config = DEFAULT_CONFIG
+    }
   } catch {
     _config = DEFAULT_CONFIG
   }
   return _config!
 }
 
-export function saveConfig(config: Partial<NKConfig>): void {
-  const current = getConfig()
-  const merged = { ...current, ...config }
+export class ConfigValidationError extends Error {
+  issues: z.ZodIssue[]
+  constructor(issues: z.ZodIssue[]) {
+    const messages = issues.map((i) => `  • ${i.path.join('.')}: ${i.message}`).join('\n')
+    super(`Конфигурация невалидна:\n${messages}`)
+    this.issues = issues
+    this.name = 'ConfigValidationError'
+  }
+}
+
+/**
+ * Сохранить конфигурацию с Zod-валидацией и атомарной записью.
+ * @throws ConfigValidationError если данные не проходят валидацию
+ */
+export function saveConfig(data: unknown): NKConfig {
+  // 1. Валидация (reject невалидных данных)
+  const result = ConfigSchema.safeParse(data)
+  if (!result.success) {
+    throw new ConfigValidationError(result.error.issues)
+  }
+  const validated = result.data
+
+  // 2. Атомарная запись: пишем в .tmp, затем rename (нет частичных файлов при crash)
   const configPath = path.join(process.cwd(), 'config.yaml')
-  writeFileSync(configPath, serializeYaml(merged))
-  _config = merged
+  const tmpPath = configPath + '.tmp'
+  const yaml = serializeYaml(validated)
+  writeFileSync(tmpPath, yaml, 'utf-8')
+  renameSync(tmpPath, configPath)
+
+  _config = validated
+  return validated
 }
 
 // Простой YAML парсер (без зависимостей) — для плоской структуры с вложенностью 1 уровня
@@ -68,7 +147,7 @@ function parseSimpleYaml(raw: string): any {
     // Секция (например "server:")
     if (!line.startsWith(' ') && trimmed.endsWith(':')) {
       if (inList && currentSection) {
-        result[currentSection] = [...result[currentSection] || [], ...listItems]
+        result[currentSection] = { ...result[currentSection], __list: listItems }
         inList = false
         listItems = []
       }
@@ -88,7 +167,7 @@ function parseSimpleYaml(raw: string): any {
     const colonIdx = trimmed.indexOf(':')
     if (colonIdx > 0 && currentSection) {
       if (inList && listItems.length > 0) {
-        result[currentSection] = [...(Array.isArray(result[currentSection]) ? result[currentSection] : []), ...listItems]
+        result[currentSection] = { ...(Array.isArray(result[currentSection]) ? {} : result[currentSection]), __list: listItems }
         inList = false
         listItems = []
       }
@@ -101,14 +180,24 @@ function parseSimpleYaml(raw: string): any {
       // Конвертируем типы
       if (value === 'true') value = true
       else if (value === 'false') value = false
-      else if (/^\d+$/.test(value)) value = parseInt(value)
-      else if (/^\d+\.\d+$/.test(value)) value = parseFloat(value)
+      else if (/^-?\d+$/.test(value)) value = parseInt(value)
+      else if (/^-?\d+\.\d+$/.test(value)) value = parseFloat(value)
       result[currentSection][key] = value
     }
   }
 
-  if (inList && currentSection && listItems.length > 0) {
-    result[currentSection] = listItems
+  // Преобразуем __list в массив (если секция была только списком)
+  for (const [section, data] of Object.entries(result)) {
+    if (data && typeof data === 'object' && '__list' in data) {
+      const list = (data as any).__list
+      const rest = { ...(data as any) }
+      delete rest.__list
+      if (Object.keys(rest).length === 0) {
+        result[section] = list
+      } else {
+        result[section] = rest
+      }
+    }
   }
 
   return result

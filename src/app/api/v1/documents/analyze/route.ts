@@ -7,29 +7,78 @@ import { logAudit } from '@/lib/audit'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import { randomUUID } from 'crypto'
-import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
+// ===== Security limits =====
+const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB — отклонять большие файлы ПЕРЕД скачиванием
+const MAX_FILE_SIZE_AFTER = 55 * 1024 * 1024 // 55 MB — двойная проверка после скачивания
+const ALLOWED_MIME_PREFIXES = ['image/', 'application/pdf', 'application/dxf', 'application/acad', 'application/octet-stream']
+const ALLOWED_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webp', 'pdf', 'svg', 'dxf', 'dwg', 'cdw', 'sldprt', 'sldasm', 'slddrw', 'spw'])
+
+/**
+ * Скачать файл с проверкой content-length ПЕРЕД полным скачиванием.
+ * Защита от OOM: отклоняет файлы > MAX_FILE_SIZE.
+ */
 async function fetchToFile(url: string): Promise<{ buffer: Buffer; mimeType: string; ext: string }> {
+  // 1. HEAD-запрос для проверки content-length без скачивания тела
+  let contentType = 'application/octet-stream'
+  let declaredSize: number | null = null
+
+  try {
+    const headRes = await fetch(url, { method: 'HEAD' })
+    if (headRes.ok) {
+      contentType = headRes.headers.get('content-type') || contentType
+      const cl = headRes.headers.get('content-length')
+      if (cl) declaredSize = parseInt(cl, 10)
+    }
+  } catch {
+    // Некоторые серверы не поддерживают HEAD — продолжаем с GET
+  }
+
+  // 2. Проверка размера ПЕРЕД скачиванием (если сервер сообщил content-length)
+  if (declaredSize !== null && declaredSize > MAX_FILE_SIZE) {
+    throw new Error(`Файл слишком большой: ${declaredSize} байт (макс. ${MAX_FILE_SIZE}). Отклонено до скачивания.`)
+  }
+
+  // 3. Проверка MIME type (если сервер сообщил в HEAD)
+  if (!ALLOWED_MIME_PREFIXES.some((p) => contentType.startsWith(p)) && contentType !== 'application/octet-stream') {
+    throw new Error(`Недопустимый тип файла: ${contentType}. Разрешены: изображения, PDF, CAD.`)
+  }
+
+  // 4. Скачивание
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Не удалось скачать файл: HTTP ${res.status}`)
-  const contentType = res.headers.get('content-type') || 'application/octet-stream'
+
+  contentType = res.headers.get('content-type') || contentType
+
+  // 5. Двойная проверка размера ПОСЛЕ скачивания
   const buffer = Buffer.from(await res.arrayBuffer())
-  // Determine extension from content-type
+  if (buffer.length > MAX_FILE_SIZE_AFTER) {
+    throw new Error(`Файл слишком большой после скачивания: ${buffer.length} байт (макс. ${MAX_FILE_SIZE_AFTER}).`)
+  }
+
+  // 6. Determine extension from content-type
   let ext = 'bin'
   if (contentType.includes('image/png')) ext = 'png'
   else if (contentType.includes('image/jpeg') || contentType.includes('image/jpg')) ext = 'jpg'
   else if (contentType.includes('image/webp')) ext = 'webp'
   else if (contentType.includes('application/pdf')) ext = 'pdf'
   else if (contentType.includes('image/svg')) ext = 'svg'
+  else if (contentType.includes('application/dxf') || contentType.includes('application/acad')) ext = 'dxf'
   else {
     // Try from URL path
     const u = new URL(url)
     const urlExt = u.pathname.split('.').pop() || ''
     if (urlExt) ext = urlExt.toLowerCase()
   }
+
+  // 7. Финальная проверка расширения (защита от загрузки исполняемых файлов)
+  if (!ALLOWED_EXTENSIONS.has(ext)) {
+    throw new Error(`Недопустимое расширение файла: .${ext}. Разрешены: ${Array.from(ALLOWED_EXTENSIONS).join(', ')}.`)
+  }
+
   return { buffer, mimeType: contentType, ext }
 }
 
@@ -49,27 +98,6 @@ function sourceTypeFromExt(ext: string): string {
     case 'slddrw': return 'slddrw'
     case 'spw': return 'spw'
     default: return 'scan'
-  }
-}
-
-async function computeFormat(filePath: string, mimeType: string): Promise<string> {
-  if (!mimeType.startsWith('image/') && !mimeType.includes('pdf')) return 'unknown'
-  try {
-    const meta = await sharp(filePath).metadata()
-    const w = meta.width ?? 0
-    const h = meta.height ?? 0
-    if (!w || !h) return 'unknown'
-    const ratio = Math.max(w, h) / Math.min(w, h)
-    const longer = Math.max(w, h)
-    if (Math.abs(ratio - Math.SQRT2) > 0.18) return 'unknown'
-    if (longer >= 4800) return 'A0'
-    if (longer >= 3400) return 'A1'
-    if (longer >= 2400) return 'A2'
-    if (longer >= 1700) return 'A3'
-    if (longer >= 1100) return 'A4'
-    return 'unknown'
-  } catch {
-    return 'unknown'
   }
 }
 
@@ -94,7 +122,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Download the file
+    // Download the file (с проверкой размера и MIME)
     const { buffer, mimeType, ext } = await fetchToFile(body.imageUrl)
     const sourceType = sourceTypeFromExt(ext)
 
@@ -105,10 +133,15 @@ export async function POST(req: NextRequest) {
     const filePath = path.join(uploadsDir, fileName)
     await writeFile(filePath, buffer)
 
-    const format = await computeFormat(filePath, mimeType)
+    // Format: null если не определён (P5: честный формат, без подмены 'unknown')
+    // Детектор запускается в analyze pipeline (detectFormatFromImage / detectFormatFromCad)
+    const format = null
 
-    // Determine project (default to first available)
-    const project = await db.project.findFirst({ select: { id: true } })
+    // Multi-tenant: проект должен принадлежать организации API-ключа
+    const project = await db.project.findFirst({
+      where: { organizationId: auth.organizationId ?? null },
+      select: { id: true },
+    })
 
     const originalName = body.name || body.imageUrl.split('/').pop() || `api-upload.${ext}`
     const doc = await db.document.create({
@@ -122,6 +155,7 @@ export async function POST(req: NextRequest) {
         status: 'new',
         filePath,
         projectId: project?.id ?? null,
+        // Multi-tenant: документ привязан к организации API-ключа
         organizationId: auth.organizationId ?? null,
         stampJson: null,
         ocrText: null,
@@ -167,6 +201,10 @@ export async function POST(req: NextRequest) {
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
+    // OOM/file-size errors → 400, not 500
+    if (msg.includes('слишком большой') || msg.includes('Недопустимый') || msg.includes('Недопустимое расширение')) {
+      return NextResponse.json({ error: msg }, { status: 400 })
+    }
     return NextResponse.json({ error: 'Не удалось обработать документ: ' + msg }, { status: 500 })
   }
 }

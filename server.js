@@ -2,6 +2,12 @@
 // Порт 1111: основной сайт нормоконтролёра (все роуты КРОМЕ /admin)
 // Порт 3333: инженерная консоль (ТОЛЬКО /admin и /api/admin)
 // Порты из config.yaml или env
+//
+// Безопасность (v1.2):
+//   - Порт 3333 принимает только /admin и /api/admin запросы
+//   - Ролевая защита реализована в src/middleware.ts (cookie nk-role):
+//     /admin/* → admin only, /api/admin/* → admin only
+//   - Для production используйте reverse proxy (Caddyfile) с SSL
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 

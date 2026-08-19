@@ -52,6 +52,7 @@ import { ApiKeys } from '@/components/nk/nk-api-keys'
 import { AuditLog } from '@/components/nk/nk-audit-log'
 import { Bench } from '@/components/nk/nk-bench'
 import { Guide } from '@/components/nk/nk-guide'
+import { RoleSwitcher } from '@/components/nk/nk-role-switcher'
 
 interface NavItem {
   id: NKView
@@ -273,6 +274,7 @@ export default function Home() {
               <CircleDot className="size-3 text-emerald-500" />
               Система активна
             </div>
+            <RoleSwitcher />
             <Button
               variant="ghost"
               size="icon"

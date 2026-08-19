@@ -1,0 +1,50 @@
+# Caddyfile.production — шаблон для production-развёртывания с авто-SSL.
+#
+# Использование:
+#   1. Скопируйте в Caddyfile (без .production)
+#   2. Замените nk-kontrol.local на ваш домен
+#   3. Запустите: caddy run --config Caddyfile
+#
+# Caddy автоматически получит SSL-сертификат от Let's Encrypt.
+#
+# Архитектура:
+#   - Основной сайт (1111) — для всех пользователей
+#   - Инженерная консоль (3333) — только для админов (доступ через /admin/*)
+#   - OCR sidecar (8100) — только localhost, не доступен снаружи
+#
+nk-kontrol.local {
+    # Основной сайт — все запросы идут на порт 1111
+    reverse_proxy localhost:1111
+
+    # Инженерная консоль — /admin/* проксируется на порт 3333
+    # Ролевая защита: middleware.ts проверяет cookie nk-role = admin
+    handle /admin/* {
+        reverse_proxy localhost:3333
+    }
+    handle /api/admin/* {
+        reverse_proxy localhost:3333
+    }
+
+    # Заголовки безопасности
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+}
+
+# Альтернатива: reverse proxy для двух доменов
+# nk-kontrol.local → основной сайт (порт 1111)
+# admin.nk-kontrol.local → инженерная консоль (порт 3333, требует VPN или IP allowlist)
+#
+# admin.nk-kontrol.local {
+#     @allowed_ips remote_ip 10.0.0.0/8 192.168.0.0/16
+#     handle @allowed_ips {
+#         reverse_proxy localhost:3333
+#     }
+#     handle {
+#         respond 403
+#     }
+# }
